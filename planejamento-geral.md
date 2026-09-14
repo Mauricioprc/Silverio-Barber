@@ -76,6 +76,20 @@ verificação é pedida **sob demanda**, na primeira vez que aquele cliente tent
 pelo canal público — não em massa. Isso evita gastar com verificação de quem nunca vai
 usar o autoatendimento.
 
+### WhatsApp Coexistência e botão manual de envio (decidido em 14/09/2026)
+
+**Verificado**: a Meta lançou "Coexistência", disponível globalmente desde junho de 2026
+(incluindo Brasil) — o mesmo número pode ser usado ao mesmo tempo no app comum do
+WhatsApp Business e na API oficial (BSP), sem precisar abrir mão do app como era exigido
+antes. Requisito operacional: abrir o app pelo menos 1x por semana, ou a API desconecta.
+Confirmar com o BSP escolhido se ele já suporta esse modo antes de contratar.
+
+**Decisão de produto**: além da automação via API (Fase 4b — confirmação/lembrete
+automático, verificação de telefone), mantém-se um botão de envio manual (link `wa.me`)
+na agenda, disponível permanentemente — não é uma etapa transitória até a automação ficar
+pronta, é uma alternativa que o sócio pode preferir usar mesmo depois, pra revisar/
+personalizar a mensagem antes de enviar. Ver detalhe técnico no prompt da Fase 4.
+
 ### Aprovação de conta comercial WhatsApp vs. aprovação de template
 
 São duas aprovações distintas da Meta, com prazos próprios e sequenciais (a segunda só
@@ -129,6 +143,17 @@ Escopo técnico detalhado de cada fase vive no prompt correspondente, não aqui.
 se só for iniciado no fim.
 
 ---
+
+## 4.1 Frontend — planejamento próprio, depois do back-end (decidido em 14/09/2026)
+
+Nenhuma das fases 1-5 inclui frontend (`apps/web`) — isso foi identificado como uma
+lacuna do planejamento original, nunca tinha sido de fato agendado. Decisão: terminar
+todo o back-end (Fases 1-5) primeiro, com a API inteira estável e verificada, e só então
+planejar o frontend como uma etapa própria — não fatiado dentro das fases de back-end.
+Quando chegar a hora, o planejamento do frontend entra como um novo documento/conjunto de
+prompts, no mesmo formato (`00-...` de convenções próprio de frontend + um prompt por
+fase de tela, se fizer sentido dividir), seguindo o mesmo processo de um chat por fase e
+um chat de verificação.
 
 ## 5. Fluxo de construção a partir de 13/09/2026
 

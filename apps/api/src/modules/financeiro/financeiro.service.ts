@@ -2,6 +2,7 @@ import { and, eq, gte, lt, sum } from "drizzle-orm";
 import type { DbOuTx, Db } from "../../db/client";
 import { lancamentosFinanceiros } from "../../db/schema";
 import type { FiltroFinanceiroInput } from "./financeiro.schema";
+import { inicioDoDiaBrasiliaUtc, inicioDoDiaSeguinteBrasiliaUtc } from "./fuso.util";
 
 type NovoLancamento = {
   agendamentoId: number;
@@ -33,23 +34,16 @@ export async function removerLancamentoDeAgendamento(tx: DbOuTx, agendamentoId: 
   await tx.delete(lancamentosFinanceiros).where(eq(lancamentosFinanceiros.agendamentoId, agendamentoId));
 }
 
-/** Início do dia seguinte a `data` ("YYYY-MM-DD"), como Date UTC — ver nota no README sobre fuso. */
-function inicioDoDiaSeguinteUtc(data: string): Date {
-  const dia = new Date(`${data}T00:00:00Z`);
-  dia.setUTCDate(dia.getUTCDate() + 1);
-  return dia;
-}
-
 function condicoesDoPeriodo(filtro: FiltroFinanceiroInput) {
   const condicoes = [];
   if (filtro.barbeiro_id !== undefined) {
     condicoes.push(eq(lancamentosFinanceiros.barbeiroId, filtro.barbeiro_id));
   }
   if (filtro.de !== undefined) {
-    condicoes.push(gte(lancamentosFinanceiros.criadoEm, new Date(`${filtro.de}T00:00:00Z`)));
+    condicoes.push(gte(lancamentosFinanceiros.criadoEm, inicioDoDiaBrasiliaUtc(filtro.de)));
   }
   if (filtro.ate !== undefined) {
-    condicoes.push(lt(lancamentosFinanceiros.criadoEm, inicioDoDiaSeguinteUtc(filtro.ate)));
+    condicoes.push(lt(lancamentosFinanceiros.criadoEm, inicioDoDiaSeguinteBrasiliaUtc(filtro.ate)));
   }
   return condicoes;
 }

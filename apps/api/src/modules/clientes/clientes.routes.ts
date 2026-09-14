@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
-import { criarClienteSchema, editarClienteSchema } from "./clientes.schema";
+import { criarClienteSchema, editarClienteSchema, listarClientesQuerySchema } from "./clientes.schema";
 import { ClienteNaoEncontradoError, TelefoneJaCadastradoError, criarCliente, editarCliente, listarClientes } from "./clientes.service";
 
 export const clientesRoutes = new Hono<AppContexto>();
@@ -12,8 +12,12 @@ export const clientesRoutes = new Hono<AppContexto>();
 clientesRoutes.use("*", exigirLogin);
 
 clientesRoutes.get("/", async (c) => {
-  const busca = c.req.query("busca");
-  const lista = await listarClientes(c.get("db"), busca);
+  const query = listarClientesQuerySchema.safeParse({ busca: c.req.query("busca") });
+  if (!query.success) {
+    return c.json({ erro: "Parâmetros inválidos.", detalhes: query.error.flatten() }, 400);
+  }
+
+  const lista = await listarClientes(c.get("db"), query.data.busca);
   return c.json({ clientes: lista });
 });
 

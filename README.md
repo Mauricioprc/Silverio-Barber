@@ -194,9 +194,14 @@ concorrência, o mesmo motivo pelo qual a trava de conflito de horário da Fase 
 constraint de banco em vez de checagem na aplicação).
 
 `GET /api/financeiro/resumo` e `GET /api/financeiro/lancamentos` filtram por `de`/`ate`
-(datas `YYYY-MM-DD`, comparadas contra `lancamentos_financeiros.criado_em` em UTC — a
-barbearia é de local único, mesma simplificação de fuso da Fase 2) e por `barbeiro_id`
-opcional. Sem `barbeiro_id`, o resultado é o consolidado dos dois sócios — é visão, não
+(datas `YYYY-MM-DD`, no calendário de **Brasília** — a aplicação roda no horário de
+Brasília, UTC-3 fixo, já que o Brasil aboliu o horário de verão em 2019) e por
+`barbeiro_id` opcional. Diferente das tabelas de agenda (que gravam horário local "naive",
+sem timezone), `lancamentos_financeiros.criado_em` é um instante real (`timestamp with
+time zone`), então o filtro converte a fronteira do dia local para UTC explicitamente
+(meia-noite em Brasília = `03:00 UTC`, não `00:00 UTC`) — ver
+`modules/financeiro/fuso.util.ts`. Sem `barbeiro_id`, o resultado é o consolidado dos
+dois sócios — é visão, não
 repartição (decisão de negócio já fechada, seção 2 do `planejamento-geral.md`): o sistema
 não calcula nem armazena nenhuma divisão/comissão automática entre sócios.
 
