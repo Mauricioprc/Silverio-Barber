@@ -14,13 +14,24 @@ export class CredenciaisInvalidasError extends Error {
 
 /**
  * Cadastro público. Se o telefone já existir em `clientes` (cadastro feito pelo balcão
- * na Fase 3, sem senha conhecida pelo próprio cliente), **vincula à conta existente**:
- * atualiza `senhaHash` (e `nome`, com o que o cliente informou agora — mais autoritativo
- * que o que o balcão digitou) em vez de tentar criar um segundo registro para o mesmo
- * telefone, o que violaria a constraint única e, mais importante, criaria duas contas
- * para a mesma pessoa. `telefoneVerificado` não é alterado aqui — cadastro (público ou
- * pelo balcão) nunca verifica o telefone sozinho, isso só acontece no fluxo de
- * `verificacao.service.ts`.
+ * na Fase 3, sem senha conhecida pelo próprio cliente), **vincula à conta existente**,
+ * mas NÃO troca `senhaHash`/`nome` na hora — quem chamou essa rota só provou conhecer o
+ * telefone (dado que não é segredo), não que é o dono dele. A senha/nome informados ficam
+ * em `senhaHashPendente`/`nomePendente` e só são aplicados quando o telefone for
+ * confirmado de verdade via código por WhatsApp (`verificacao.service.ts`,
+ * `confirmarCodigoVerificacao`) — ver comentário em `db/schema.ts` para o raciocínio
+ * completo (isso fecha um sequestro de conta: sem essa trava, bastava saber o telefone de
+ * um cliente já cadastrado pra assumir a conta dele).
+ *
+ * `telefoneVerificado` é forçado para `false` neste caminho mesmo que já estivesse
+ * `true` antes — sem isso, alguém que soubesse o telefone de um cliente já verificado
+ * herdaria esse `true` e conseguiria agendar (`POST /api/publico/agendamentos` exige
+ * `telefoneVerificado = true`) antes mesmo de provar posse do telefone.
+ *
+ * Uma sessão é iniciada de qualquer forma (ver rota) para permitir chamar
+ * `/verificacao/enviar` e `/confirmar` em seguida — mas até a verificação ser concluída,
+ * a conta continua com a senha/nome originais (do balcão), não os que acabaram de ser
+ * enviados nesta chamada.
  */
 export async function cadastrarClientePublico(db: Db, dados: CadastroPublicoInput): Promise<{ id: number; vinculado: boolean }> {
   const senhaHash = await gerarHashSenha(dados.senha);
@@ -28,7 +39,10 @@ export async function cadastrarClientePublico(db: Db, dados: CadastroPublicoInpu
   const [existente] = await db.select({ id: clientes.id }).from(clientes).where(eq(clientes.telefone, dados.telefone)).limit(1);
 
   if (existente) {
-    await db.update(clientes).set({ nome: dados.nome, senhaHash }).where(eq(clientes.id, existente.id));
+    await db
+      .update(clientes)
+      .set({ nomePendente: dados.nome, senhaHashPendente: senhaHash, telefoneVerificado: false })
+      .where(eq(clientes.id, existente.id));
     return { id: existente.id, vinculado: true };
   }
 

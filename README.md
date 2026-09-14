@@ -351,11 +351,31 @@ automação estiver funcionando — não é uma etapa transitória, é uma alter
 
 `POST /api/publico/clientes/cadastro` verifica se o telefone já existe em `clientes`
 (cadastro feito pelo balcão na Fase 3, com uma senha que o próprio cliente não conhece).
-Se existir, **vincula à conta existente**: atualiza `nome` e `senhaHash` com o que o
-cliente acabou de informar (agora ele consegue logar de verdade), em vez de tentar criar
-um segundo registro — o que violaria a constraint única de telefone e, pior, criaria duas
-contas para a mesma pessoa. Resposta `200` nesse caso (vs. `201` para cadastro novo de
-verdade), com `{ clienteId, vinculado: true }`.
+Se existir, **vincula à conta existente** em vez de tentar criar um segundo registro — o
+que violaria a constraint única de telefone e, pior, criaria duas contas para a mesma
+pessoa. Resposta `200` nesse caso (vs. `201` para cadastro novo de verdade), com
+`{ clienteId, vinculado: true }`.
+
+**Correção pós-auditoria (a versão original desta rota tinha uma falha de segurança
+real)**: a versão original trocava `senhaHash`/`nome` da conta existente imediatamente,
+sem nenhuma verificação — bastava alguém saber o telefone de um cliente já cadastrado
+(dado que não é segredo) para assumir a conta, e pior, `telefone_verificado` ficava
+intocado, então se o cliente real já tinha verificado o telefone antes, o atacante
+herdava esse `true` e podia agendar imediatamente, sem precisar provar posse do telefone
+em momento nenhum. Confirmado explorando o cenário de verdade contra Postgres real antes
+de corrigir.
+
+**Comportamento atual**: ao vincular a uma conta existente, `nome`/`senhaHash` **não são
+trocados na hora** — ficam pendentes em `clientes.nomePendente`/`senhaHashPendente`, e
+`telefoneVerificado` é forçado para `false` (mesmo que já fosse `true`). Uma sessão de
+cliente é iniciada normalmente (para permitir chamar as rotas de verificação em seguida),
+mas até o telefone ser confirmado de verdade via código por WhatsApp
+(`POST /api/publico/clientes/verificacao/confirmar`), a conta continua com a senha/nome
+originais (os que o balcão cadastrou) — só quem de fato recebe o código no telefone real
+consegue completar a verificação e, nesse momento, `confirmarCodigoVerificacao`
+(`verificacao.service.ts`) aplica o nome/senha pendentes e limpa os dois campos. Um
+atacante que só sabe o telefone pode chamar `/cadastro` e criar a solicitação pendente,
+mas nunca consegue completá-la sem receber o código no telefone de verdade.
 
 ## Comportamento de bootstrap (`registrar-socio`)
 

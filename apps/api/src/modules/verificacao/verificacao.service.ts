@@ -106,6 +106,12 @@ export async function enviarCodigoVerificacao(
  * `usado_em` (o código nunca pode ser reutilizado, mesmo dentro da validade) e
  * `clientes.telefone_verificado = true`. Lança `CodigoInvalidoError` (mensagem
  * genérica) em qualquer caso de falha — errado, expirado, ou já usado.
+ *
+ * Também aplica `nomePendente`/`senhaHashPendente`, se houver (fluxo de vínculo de
+ * cadastro público a uma conta pré-existente — ver `clientes-publico.service.ts`): só
+ * agora, com o telefone de fato confirmado como do próprio dono, a senha/nome que a
+ * pessoa informou no cadastro público passam a valer de verdade. Sem código pendente
+ * (cliente que já não tinha nenhum vínculo pendente), isso é um no-op.
  */
 export async function confirmarCodigoVerificacao(db: Db, clienteId: number, codigo: string): Promise<void> {
   const codigoHash = await hashCodigo(codigo);
@@ -130,5 +136,25 @@ export async function confirmarCodigoVerificacao(db: Db, clienteId: number, codi
   }
 
   await db.update(codigosVerificacao).set({ usadoEm: agora }).where(eq(codigosVerificacao.id, registro.id));
-  await db.update(clientes).set({ telefoneVerificado: true }).where(eq(clientes.id, clienteId));
+
+  const [clienteAtual] = await db
+    .select({ nomePendente: clientes.nomePendente, senhaHashPendente: clientes.senhaHashPendente })
+    .from(clientes)
+    .where(eq(clientes.id, clienteId))
+    .limit(1);
+
+  await db
+    .update(clientes)
+    .set({
+      telefoneVerificado: true,
+      ...(clienteAtual?.nomePendente !== undefined && clienteAtual?.nomePendente !== null
+        ? { nome: clienteAtual.nomePendente }
+        : {}),
+      ...(clienteAtual?.senhaHashPendente !== undefined && clienteAtual?.senhaHashPendente !== null
+        ? { senhaHash: clienteAtual.senhaHashPendente }
+        : {}),
+      nomePendente: null,
+      senhaHashPendente: null,
+    })
+    .where(eq(clientes.id, clienteId));
 }

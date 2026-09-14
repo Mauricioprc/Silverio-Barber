@@ -89,6 +89,17 @@ export const sessoes = pgTable("sessoes", {
  * `telefoneVerificado` fica `false` até a Fase 4 implementar a verificação por WhatsApp
  * sob demanda — nesta fase o cadastro é feito pelo balcão/staff, presencial, sem canal
  * público ainda.
+ *
+ * `senhaHashPendente`/`nomePendente` (Fase 4, correção pós-auditoria — ver
+ * `clientes-publico.service.ts`): quando o cadastro público (`POST
+ * /api/publico/clientes/cadastro`) encontra um telefone já cadastrado pelo balcão, ele
+ * NÃO sobrescreve `senhaHash`/`nome` na hora — quem chama essa rota só provou conhecer o
+ * telefone, não posse dele. A senha/nome desejados ficam pendentes aqui até
+ * `confirmarCodigoVerificacao` (verificacao.service.ts) confirmar, via código enviado por
+ * WhatsApp pro telefone real, que quem está pedindo a troca é de fato o dono do telefone.
+ * Só nesse momento os valores pendentes são aplicados e limpos. Isso fecha um sequestro
+ * de conta: sem essa trava, qualquer um que soubesse o telefone de um cliente já
+ * cadastrado conseguia trocar a senha dele e assumir a conta sem nenhuma verificação.
  */
 export const clientes = pgTable("clientes", {
   id: serial("id").primaryKey(),
@@ -96,6 +107,8 @@ export const clientes = pgTable("clientes", {
   telefone: text("telefone").notNull().unique(),
   senhaHash: text("senha_hash").notNull(),
   telefoneVerificado: boolean("telefone_verificado").notNull().default(false),
+  senhaHashPendente: text("senha_hash_pendente"),
+  nomePendente: text("nome_pendente"),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
