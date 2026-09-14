@@ -120,6 +120,14 @@ o horário para reuso. Por isso a exclusion constraint **não** tem a cláusula
 `WHERE status <> 'cancelado'` do SQL de referência da regra 8: aqui, "liberar o horário"
 é a linha de ocupação deixar de existir, não um filtro na constraint.
 
+`editarAgendamento` sempre apaga a linha de ocupação atual e a recria se o novo status for
+diferente de `cancelado` — não só quando horário/barbeiro mudam. Isso é necessário para
+cobrir **reativar** um agendamento cancelado (`status: cancelado` → `confirmado`, sem
+mudar horário): a ocupação tinha sido removida no cancelamento anterior, e sem recriá-la a
+trava de conflito ficaria desligada para aquele agendamento — confirmado com um teste real
+contra Postgres (ver seção de teste de concorrência) que, antes dessa correção, permitia
+dois agendamentos confirmados sobrepostos nesse cenário específico.
+
 ## `DELETE` de agendamento não existe (soft delete via `status`)
 
 Igual à regra 5 (soft delete de serviço), um agendamento nunca é apagado de verdade: ele é

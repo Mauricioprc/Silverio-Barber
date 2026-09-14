@@ -111,12 +111,17 @@ async function buscarAgendamento(db: DbOuTx, id: number) {
 }
 
 /**
- * Edita status e/ou reagenda (horário/barbeiro). Reagendar refaz a linha de ocupação
- * (apaga a antiga, insere a nova) dentro da mesma transação, então passa pela exclusion
- * constraint de novo — um reagendamento para um horário ocupado é rejeitado igual a uma
- * criação nova. Marcar como `cancelado` sempre libera a ocupação (soft delete só na
- * tabela `agendamentos` — ver comentário em `db/schema.ts`); marcar como `concluido` não
- * libera (o horário já aconteceu, continua "ocupado" para fins de histórico/consulta).
+ * Edita status e/ou reagenda (horário/barbeiro). A linha de ocupação é sempre refeita
+ * (apagada e, se aplicável, reinserida) dentro da mesma transação — não só quando
+ * horário/barbeiro mudam. Isso é necessário porque reativar um agendamento cancelado
+ * (`status: cancelado` → `confirmado`, sem mudar horário) também precisa recriar a
+ * ocupação: a linha foi removida no cancelamento anterior, e sem recriá-la a trava de
+ * conflito (regra 8) fica desligada para esse agendamento — dois agendamentos
+ * confirmados no mesmo horário passariam despercebidos. Reagendar (mudar horário/
+ * barbeiro) passa pela exclusion constraint de novo do mesmo jeito, pela reinserção.
+ * Marcar como `cancelado` libera a ocupação (soft delete só na tabela `agendamentos` —
+ * ver comentário em `db/schema.ts`); qualquer outro status (`confirmado`/`concluido`)
+ * mantém/recria a ocupação — o horário continua "ocupado" para fins de trava/histórico.
  */
 export async function editarAgendamento(db: Db, id: number, dados: EditarAgendamentoInput) {
   return db.transaction(async (tx) => {
@@ -143,7 +148,6 @@ export async function editarAgendamento(db: Db, id: number, dados: EditarAgendam
       fim = somarMinutos(inicio, duracaoMinutos);
     }
 
-    const horarioOuBarbeiroMudou = dados.inicio !== undefined || dados.barbeiroId !== undefined;
     const novoStatus = dados.status ?? atual.status;
 
     const [atualizado] = await tx
@@ -156,10 +160,11 @@ export async function editarAgendamento(db: Db, id: number, dados: EditarAgendam
       throw new AgendamentoNaoEncontradoError();
     }
 
-    if (novoStatus === "cancelado") {
-      await removerOcupacaoDeAgendamento(tx, id);
-    } else if (horarioOuBarbeiroMudou) {
-      await removerOcupacaoDeAgendamento(tx, id);
+    // Sempre remove a ocupação atual e, se o agendamento continua/passa a valer para fins
+    // de trava de conflito (todo status exceto `cancelado`), reinsere com o horário/
+    // barbeiro vigentes — cobre reagendar E reativar um agendamento cancelado.
+    await removerOcupacaoDeAgendamento(tx, id);
+    if (novoStatus !== "cancelado") {
       await inserirOcupacao(tx, { tipo: "agendamento", agendamentoId: id, barbeiroId, inicio, fim });
     }
 
