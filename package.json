@@ -8,6 +8,10 @@
   "scripts": {
     "dev:api": "npm run dev --workspace apps/api",
     "db:generate": "npm run db:generate --workspace apps/api",
-    "db:migrate": "npm run db:migrate --workspace apps/api"
+    "db:migrate": "npm run db:migrate --workspace apps/api",
+    "test:integracao": "npm run test:integracao --workspace apps/api"
+  },
+  "allowScripts": {
+    "@embedded-postgres/windows-x64@18.4.0-beta.17": true
   }
 }

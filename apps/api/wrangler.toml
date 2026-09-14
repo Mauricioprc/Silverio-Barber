@@ -3,8 +3,35 @@ main = "src/index.ts"
 compatibility_date = "2024-12-05"
 compatibility_flags = ["nodejs_compat"]
 
-# Variáveis não-sensíveis podem ficar aqui. As sensíveis (DATABASE_URL, SESSAO_SECRETO)
-# NUNCA devem ser colocadas neste arquivo — configure via `wrangler secret put` em
-# produção e via `.dev.vars` (não versionado) em desenvolvimento local. Ver README.md.
+# Variáveis não-sensíveis podem ficar aqui. As sensíveis (DATABASE_URL, SESSAO_SECRETO,
+# WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID) NUNCA devem ser colocadas neste arquivo —
+# configure via `wrangler secret put` em produção e via `.dev.vars` (não versionado) em
+# desenvolvimento local. Ver README.md.
 [vars]
 AMBIENTE = "desenvolvimento"
+WHATSAPP_MODO = "mock"
+
+# --- Ambiente de produção (Fase 5) --------------------------------------------------
+# Roteamento por CAMINHO ÚNICO sob o mesmo domínio-base — NÃO subdomínio separado (ver
+# 00-arquitetura-e-convencoes.md, "Nota operacional: domínio e cookie entre front e
+# API": subdomínios exigem o atributo `Domain` explícito no cookie e complicam o
+# same-site; caminho único evita o problema por completo, front e API viram o mesmo
+# origin do ponto de vista do navegador). Preencha <SEU-DOMINIO> assim que o domínio for
+# registrado — ver CHECKLIST-DEPLOY.md, passo de domínio.
+#
+# `zone_name` precisa ser o domínio já adicionado como zona no Cloudflare (painel ou
+# `wrangler`) antes do primeiro `wrangler deploy --env production`. O restante do
+# domínio (tudo que não bate em `/api/*`) é servido pelo Cloudflare Pages do frontend —
+# rota de Worker tem prioridade sobre Pages para o padrão que ela cobre, então não é
+# preciso nenhuma configuração adicional do lado do Pages para "não pegar" `/api/*`.
+[env.production]
+routes = [
+  { pattern = "<SEU-DOMINIO>/api/*", zone_name = "<SEU-DOMINIO>" }
+]
+
+[env.production.vars]
+AMBIENTE = "producao"
+WHATSAPP_MODO = "real"
+# Nomes exatos dos templates aprovados pela Meta — ver checklist de WhatsApp no README.
+WHATSAPP_TEMPLATE_CONFIRMACAO = "<nome_do_template_aprovado>"
+WHATSAPP_TEMPLATE_LEMBRETE = "<nome_do_template_aprovado>"

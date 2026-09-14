@@ -1,15 +1,16 @@
 # Silvério Barbearia — Sistema de Gestão
 
-Monorepo do sistema de gestão da barbearia. Este repositório está na **Fase 4**
-(agendamento online + WhatsApp): só a API (`apps/api`) existe — auth dos sócios, CRUD de
-serviços, cadastro de barbeiros/disponibilidade (Fase 1), agendamentos + bloqueios de
-agenda com trava de conflito de horário no próprio banco (Fase 2), cadastro de cliente
-pelo balcão + lançamento financeiro automático (Fase 3), e agora cadastro/login público
-de cliente, verificação de telefone por WhatsApp com rate-limiting, página pública de
-agendamento (rotas de API) e confirmação/lembrete automático via WhatsApp — com opt-in
-explícito e uma implementação mock de WhatsApp para desenvolver sem depender da aprovação
-da Meta (Fase 4). Sem frontend ainda (ver `planejamento-geral.md` para o mapa completo
-das fases).
+Monorepo do sistema de gestão da barbearia. Este repositório está na **Fase 5**
+(testes e implantação — última fase de back-end): a API (`apps/api`) está completa —
+auth dos sócios, CRUD de serviços, cadastro de barbeiros/disponibilidade (Fase 1),
+agendamentos + bloqueios de agenda com trava de conflito de horário no próprio banco
+(Fase 2), cadastro de cliente pelo balcão + lançamento financeiro automático (Fase 3),
+cadastro/login público de cliente + verificação por WhatsApp + agendamento online +
+confirmação/lembrete automático (Fase 4), e agora uma suíte de teste de integração
+consolidada, estimativa de uso de CU-horas da Neon, estratégia de backup, configuração de
+roteamento por domínio e um checklist de deploy único (Fase 5 —
+[`CHECKLIST-DEPLOY.md`](CHECKLIST-DEPLOY.md)). Frontend fica como planejamento próprio, a
+partir daqui (ver `planejamento-geral.md`).
 
 Stack: Cloudflare Workers (Hono) + Neon Postgres (Drizzle ORM) + Zod. Detalhe completo e
 justificativas em [`00-arquitetura-e-convencoes.md`](00-arquitetura-e-convencoes.md).
@@ -403,27 +404,165 @@ existe para fechar.
 
 ## Checklist antes de ir para produção
 
-1. Criar um projeto Neon **real** de produção (free, sem cartão de crédito — 100
-   CU-horas/mês e 0,5 GB de armazenamento; ver `00-arquitetura-e-convencoes.md`).
-2. Gerar um `SESSAO_SECRETO` real (aleatório, forte) e configurar via
-   `wrangler secret put SESSAO_SECRETO`.
-3. Configurar `DATABASE_URL` de produção via `wrangler secret put DATABASE_URL`.
-4. Aplicar a migração no banco real: `DATABASE_URL=<url-de-producao> npm run db:migrate`.
-   A migração da Fase 2 (`0001_orange_colonel_america.sql`) já inclui
-   `CREATE EXTENSION IF NOT EXISTS btree_gist;` como primeiro passo — pré-requisito da
-   exclusion constraint (regra 8 do documento de convenções). Confirme que ela ativa sem
-   erro no projeto Neon de produção específico (documentação da Neon indica suporte em
-   todos os planos, mas vale confirmar — ver `00-arquitetura-e-convencoes.md`).
-5. Cadastrar os 2 sócios via `POST /api/auth/registrar-socio` **imediatamente após o
-   deploy, antes de qualquer outra pessoa conseguir acessar a URL pública** — a rota se
-   fecha sozinha depois do 2º registro, mas até lá qualquer um que descobrir a URL
-   poderia se cadastrar como sócio.
-6. Usar **roteamento por caminho único sob o mesmo domínio**
-   (`dominio.com.br/api/*` → Worker, resto → Pages) em vez de subdomínios separados para
-   front e API. Ver a nota operacional sobre cookies em
-   `00-arquitetura-e-convencoes.md`: sem isso (ou sem o atributo `Domain` explícito no
-   cookie, se optar por subdomínios mesmo assim), o login pode não funcionar em
-   produção.
+A partir da Fase 5, o checklist de deploy completo (banco, segredos, WhatsApp, domínio,
+backup, bootstrap dos sócios, testes finais) vive num documento único:
+**[`CHECKLIST-DEPLOY.md`](CHECKLIST-DEPLOY.md)** — não fica mais espalhado entre as
+seções de cada fase deste README. Consulte-o diretamente na hora do deploy real; as
+seções abaixo (estimativa de CU-horas, backup, roteamento) têm o detalhe técnico que o
+checklist referencia.
+
+## Estimativa de uso de CU-horas (Neon, plano free) — Fase 5
+
+O plano free da Neon dá **100 CU-horas/mês** (verificado na documentação oficial:
+"enough to run a 0.25 CU compute in a project for 400 hours/month" — ou seja, o cálculo
+é `CU-horas = tamanho do compute (CU) × horas em que ele ficou acordado`, não horas
+corridas do mês). Autosuspend obrigatório após 5 min de inatividade — cada requisição
+reseta esse contador, então o compute fica "acordado" continuamente durante qualquer
+janela em que as requisições cheguem com menos de 5 min de intervalo entre si, e volta a
+dormir só depois de 5 min sem nenhuma.
+
+**Premissas** (documentadas explicitamente — não é uma medição real, é projeção):
+
+- Tamanho de compute: **0,25 CU** — o mínimo do autoscaling do plano free. Assumido
+  porque o volume de tráfego deste sistema (CRUD simples, poucos usuários simultâneos)
+  não tem motivo pra disparar o autoscaling da Neon pra cima sob uso normal; se isso se
+  mostrar errado na prática, a estimativa toda sobe proporcionalmente.
+- Barbearia aberta ~9h/dia, 6 dias/semana ≈ 26 dias úteis/mês — durante esse horário,
+  assumido que o uso do sistema pelo balcão (agenda, criar agendamento, financeiro) é
+  frequente o bastante pra manter o compute acordado a janela toda (intervalos < 5 min
+  entre requisições), não só picos isolados.
+- A página pública de agendamento (Fase 4) fica acessível 24h/dia — tráfego fora do
+  horário comercial (alguém navegando/agendando à noite) é esperado, mas mais esparso;
+  estimado em ~1h/dia adicional de compute acordado por esse motivo, espalhado pelos
+  dias abertos.
+
+**Cálculo**: (26 dias × 9h) + (26 dias × 1h) ≈ 260h de compute acordado/mês × 0,25 CU ≈
+**65 CU-horas/mês (≈ 65% do teto)**.
+
+**Cenário mais pessimista** (mais realista de se planejar para, dado que o negócio pode
+crescer): barbearia aberta 7 dias/semana em vez de 6, jornada de 10h em vez de 9h, e mais
+tráfego público fora do horário (~2h/dia) — dá (30×10 + 30×2) × 0,25 ≈ **90 CU-horas/mês
+(≈ 90% do teto)**.
+
+**Conclusão**: a faixa projetada (65-90%+) **não é uma folga confortável** — está
+exatamente na zona que o critério desta fase pede pra tratar como recomendação explícita
+de upgrade, não como "provavelmente vai dar certo". Ver `CHECKLIST-DEPLOY.md` para a
+ação recomendada (acompanhar uso real no painel da Neon nas primeiras semanas em
+produção e orçar upgrade para um plano pago antes de bater no teto, não depois).
+Fonte: [Neon plans](https://neon.com/docs/introduction/plans) (100 CU-horas/mês, 400h de
+compute 0,25 CU, verificado em 14/09/2026).
+
+## Estratégia de backup — Fase 5
+
+O plano free da Neon inclui **point-in-time restore (PITR) de 6 horas**, automático, sem
+nenhuma configuração adicional (verificado na documentação oficial: "6-hour limit,
+capped at 1 GB of change history" para o histórico de mudanças). Isso cobre bem o caso
+"percebi um erro há poucas horas, quero voltar pra antes dele" — mas **não é suficiente
+sozinho** para este projeto: é dado financeiro e de agendamento de um negócio real, e um
+problema notado um dia (ou uma semana) depois do fato não seria recuperável só com essa
+janela.
+
+**Recomendação**: complementar com um export periódico próprio (`pg_dump`), independente
+do PITR da Neon. Não é necessário rodar isso dentro do Worker (Workers não têm um
+mecanismo de cron neste projeto ainda — ver `modules/lembretes/` na Fase 4, mesma
+observação) — pode ser um job simples fora da infraestrutura de Workers (ex.: GitHub
+Actions com um cron schedule, ou uma máquina/serviço externo qualquer com acesso à
+`DATABASE_URL`):
+
+```bash
+pg_dump "$DATABASE_URL" --format=custom --file="backup-$(date +%Y%m%d-%H%M).dump"
+```
+
+- **Frequência recomendada**: diária, fora do horário comercial.
+- **Retenção recomendada**: pelo menos 30 dias rolantes (a decidir com o proprietário se
+  precisa de mais, considerando que é dado financeiro).
+- **Importante**: gerar o export não basta — **testar a restauração** pelo menos uma vez
+  antes do lançamento (`pg_restore` contra um banco Neon separado, de teste, e conferir
+  que os dados batem), porque um backup nunca testado é uma suposição, não uma garantia.
+
+Fonte: [Neon plans — Point-in-Time Restore](https://neon.com/docs/introduction/plans)
+(6-hour PITR window no plano free, verificado em 14/09/2026).
+
+## Roteamento por domínio único — configuração (Fase 5)
+
+`apps/api/wrangler.toml` já tem um bloco `[env.production]` pronto para receber o
+domínio real assim que for registrado (ver `CHECKLIST-DEPLOY.md`, seção de domínio):
+`routes = [{ pattern = "<SEU-DOMINIO>/api/*", zone_name = "<SEU-DOMINIO>" }]` — os dois
+`<SEU-DOMINIO>` precisam virar o domínio de verdade, e o domínio precisa já existir como
+zona no Cloudflare antes do primeiro `npm run deploy:producao`. Uma rota de Worker tem
+prioridade sobre o Cloudflare Pages para o padrão que ela cobre dentro da mesma zona —
+não é necessária nenhuma configuração adicional do lado do Pages para ele "não pegar"
+`/api/*`.
+
+**Por que caminho único, não subdomínio** (`app.dominio.com.br` + `api.dominio.com.br`):
+já registrado em `00-arquitetura-e-convencoes.md` — mesmo colocando os dois sob o mesmo
+domínio-base, requisições entre subdomínios diferentes ainda tratam o cookie como
+*host-only* por padrão (fica restrito ao host exato onde foi setado), a menos que o
+atributo `Domain` seja setado explicitamente no cookie. Caminho único faz front e API
+serem o mesmo origin do ponto de vista do navegador, evitando esse raciocínio por
+completo — é por isso que este projeto nunca usou o atributo `Domain` no cookie, em
+nenhuma das fases.
+
+**Não foi possível validar isso de ponta a ponta neste ambiente** (exige um domínio real
+registrado e uma zona Cloudflare de verdade, que este ambiente de desenvolvimento não
+tem) — o `CHECKLIST-DEPLOY.md` (seção 6) tem o roteiro exato de validação manual pra
+rodar contra o domínio real assim que ele existir: login, inspecionar o cookie no
+DevTools (`Secure`/`HttpOnly`/`SameSite=Strict`, sem `Domain` explícito), e confirmar que
+uma chamada a uma rota protegida a partir de uma página servida pelo Pages funciona sem
+`401` — repetido tanto para o cookie de sócio quanto para o de cliente (são cookies
+separados, ver seção de bootstrap/auth acima).
+
+## Suíte de teste de integração consolidada (Fase 5)
+
+`apps/api/scripts/teste-integracao.mjs` (`npm run test:integracao`, dentro de `apps/api`)
+reúne num único script, permanente no repositório (não mais um script descartável rodado
+manualmente a cada fase), os cenários de regressão identificados ao longo do projeto —
+todos rodando contra um Postgres 18 **real** (`embedded-postgres`, mesmo mecanismo usado
+nas verificações das Fases 2-4), com as migrações reais do repositório aplicadas:
+
+- **Concorrência de agendamento** (Fase 2): dois `POST /api/agendamentos` simultâneos
+  pro mesmo barbeiro/horário → 1 aceito, 1 rejeitado com `23P01`.
+- **Reativar agendamento cancelado com conflito** (regressão do bug corrigido na Fase 2 —
+  ver commit "Corrige reativação de agendamento cancelado sem recriar ocupação"): mudar
+  o status de volta pra `confirmado` enquanto outro agendamento já ocupa o mesmo horário
+  → rejeitado, `ocupacoes_barbeiro` continua sincronizada.
+- **Agendamento dentro de um bloqueio existente** (Fase 2): rejeitado.
+- **Fluxo normal de verificação por WhatsApp** (Fase 4): cadastro → código → confirmação
+  → `telefone_verificado = true`.
+- **Regressão do sequestro de conta** (correção pós-auditoria da Fase 4): cadastro
+  público com telefone já existente do balcão não troca nome/senha até o código ser
+  confirmado, um "atacante" tentando adivinhar o código é rejeitado, e só a confirmação
+  de verdade (com o código que teria ido pro telefone real) aplica os dados pendentes.
+- **Rate-limiting** (regra 7, Fase 4): 4 tentativas de reenvio em sequência controlada →
+  as 3 primeiras aceitas respeitando o backoff (60s/180s), a 4ª rejeitada por limite de
+  janela — mesmo teste já feito isoladamente na Fase 4, agora parte permanente da suíte
+  de regressão, não descartado.
+
+**Por que reimplementar as queries em SQL puro em vez de importar os services de
+verdade**: `db/client.ts` usa `@neondatabase/serverless` (`Pool`), que fala o protocolo
+específico do proxy da Neon — não conecta a um Postgres genérico (confirmado na prática
+já na Fase 1). O script reimplementa as sequências de operação relevantes (inserir/
+apagar `ocupacoes_barbeiro` junto com `agendamentos`/`bloqueios_agenda` na mesma
+transação, a lógica de rate-limit) deliberadamente próximas ao código real, para que uma
+divergência de comportamento apareça como teste quebrado — ver comentário no topo do
+próprio script para o detalhe completo.
+
+**Resultado da última execução**: 16 de 16 cenários passaram.
+
+**Primeira instalação**: `embedded-postgres` baixa um binário real do Postgres para a
+sua plataforma (Windows/Mac/Linux, resolvido automaticamente pelo npm) como parte de
+`npm install` — a instalação já vem pré-aprovada para Windows (`allowScripts` no
+`package.json` da raiz); em outra plataforma, o npm pode pedir uma aprovação única de
+script na primeira vez (`npm approve-scripts` — é o mecanismo de permissão de scripts de
+instalação do próprio npm, não algo deste projeto), depois disso não pede de novo.
+
+**Nota de ambiente (Windows)**: `embedded-postgres` ocasionalmente demorou a liberar a
+porta TCP entre uma execução e outra neste ambiente de desenvolvimento (o processo
+Postgres em si sempre funcionou normalmente — só o encerramento, via `pg.stop()`,
+esporadicamente não retornava). O script usa uma porta aleatória a cada execução e força
+sua própria saída ao final (não depende de `pg.stop()`/`client.end()` retornarem) para
+não ficar pendurado por causa disso — mas se você notar uma execução travada sem
+progresso por mais de ~1 minuto, é seguro interromper (Ctrl+C) e rodar de novo.
 
 ## Testando o fluxo completo manualmente
 
@@ -701,4 +840,7 @@ checklist da seção "`EnviadorWhatsapp`: mock vs. real" acima.
 - [`04-fase3-financeiro-cliente.md`](04-fase3-financeiro-cliente.md) — escopo da Fase 3
   (financeiro e cadastro de cliente).
 - [`05-fase4-agendamento-online-whatsapp.md`](05-fase4-agendamento-online-whatsapp.md) —
-  escopo desta fase (agendamento online + WhatsApp).
+  escopo da Fase 4 (agendamento online + WhatsApp).
+- [`06-fase5-testes-implantacao.md`](06-fase5-testes-implantacao.md) — escopo desta fase
+  (testes e implantação).
+- [`CHECKLIST-DEPLOY.md`](CHECKLIST-DEPLOY.md) — checklist único de deploy (Fase 5).
