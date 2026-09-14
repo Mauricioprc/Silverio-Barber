@@ -17,13 +17,26 @@ const telefoneSchema = z
   .trim()
   .regex(/^\+?[0-9]{10,15}$/, "Telefone inválido — use apenas dígitos (com DDD, opcionalmente com +55).");
 
-export const criarAgendamentoSchema = z.object({
-  barbeiroId: z.number().int().positive(),
-  servicoId: z.number().int().positive(),
-  nomeCliente: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120),
-  telefoneCliente: telefoneSchema,
-  inicio: horarioLocalSchema,
-});
+/**
+ * `clienteId` é opcional (Fase 3, não retroativo): quando informado, nome/telefone são
+ * preenchidos a partir do cadastro em `clientes` (ver `agendamentos.service.ts`), e
+ * `nomeCliente`/`telefoneCliente` do corpo — se vierem — são ignorados. Sem `clienteId`,
+ * `nomeCliente`/`telefoneCliente` são obrigatórios (contato avulso, comportamento da
+ * Fase 2 inalterado).
+ */
+export const criarAgendamentoSchema = z
+  .object({
+    barbeiroId: z.number().int().positive(),
+    servicoId: z.number().int().positive(),
+    clienteId: z.number().int().positive().optional(),
+    nomeCliente: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120).optional(),
+    telefoneCliente: telefoneSchema.optional(),
+    inicio: horarioLocalSchema,
+  })
+  .refine((dados) => dados.clienteId !== undefined || (dados.nomeCliente !== undefined && dados.telefoneCliente !== undefined), {
+    message: "Informe clienteId, ou nomeCliente e telefoneCliente.",
+    path: ["clienteId"],
+  });
 
 /** Status possíveis de um agendamento. */
 export const statusAgendamentoSchema = z.enum(["confirmado", "cancelado", "concluido"]);

@@ -1,10 +1,13 @@
 # Silvério Barbearia — Sistema de Gestão
 
-Monorepo do sistema de gestão da barbearia. Este repositório está na **Fase 2**
-(agenda): só a API (`apps/api`) existe — auth dos sócios, CRUD de serviços, cadastro de
-barbeiros/disponibilidade (Fase 1) e agora agendamentos + bloqueios de agenda com trava
-de conflito de horário no próprio banco (Fase 2). Sem frontend, sem cadastro de cliente
-final, sem WhatsApp ainda (ver `planejamento-geral.md` para o mapa completo das fases).
+Monorepo do sistema de gestão da barbearia. Este repositório está na **Fase 3**
+(financeiro e cadastro de cliente): só a API (`apps/api`) existe — auth dos sócios, CRUD
+de serviços, cadastro de barbeiros/disponibilidade (Fase 1), agendamentos + bloqueios de
+agenda com trava de conflito de horário no próprio banco (Fase 2), e agora cadastro de
+cliente pelo balcão, vínculo opcional de agendamento a cliente, lançamento financeiro
+automático e dashboard consolidado/por sócio (Fase 3). Sem frontend, sem login de
+cliente/página pública, sem WhatsApp ainda (ver `planejamento-geral.md` para o mapa
+completo das fases).
 
 Stack: Cloudflare Workers (Hono) + Neon Postgres (Drizzle ORM) + Zod. Detalhe completo e
 justificativas em [`00-arquitetura-e-convencoes.md`](00-arquitetura-e-convencoes.md).
@@ -77,11 +80,16 @@ obtido via `/api/auth/login`.
 | GET | `/api/barbeiros/:id/disponibilidade` | Sessão | Lista a disponibilidade semanal do barbeiro. |
 | PUT | `/api/barbeiros/:id/disponibilidade` | Sessão | `{ disponibilidade: [{ diaSemana, horaInicio, horaFim }] }` — substitui a semana inteira (apaga e recria). |
 | GET | `/api/agendamentos?barbeiro_id=&data=` | Sessão | Agenda diária de um barbeiro (`data` = `YYYY-MM-DD`). Ambos os parâmetros são obrigatórios. |
-| POST | `/api/agendamentos` | Sessão | `{ barbeiroId, servicoId, nomeCliente, telefoneCliente, inicio }` — `inicio` no formato `"YYYY-MM-DD HH:MM"` (sem fuso, ver seção de horários abaixo). `fim` e `valorCobradoCentavos` são calculados/copiados do serviço no momento da criação. 409 se conflitar com outro agendamento/bloqueio do mesmo barbeiro. |
-| PUT | `/api/agendamentos/:id` | Sessão | `{ barbeiroId?, inicio?, status? }` — reagenda (recalcula `fim`, refaz a trava de conflito) e/ou muda status (`confirmado`\|`cancelado`\|`concluido`). Não existe `DELETE` — ver seção abaixo. |
+| POST | `/api/agendamentos` | Sessão | `{ barbeiroId, servicoId, clienteId? \| (nomeCliente + telefoneCliente), inicio }` — `inicio` no formato `"YYYY-MM-DD HH:MM"` (sem fuso, ver seção de horários abaixo). `fim` e `valorCobradoCentavos` são calculados/copiados do serviço no momento da criação; se `clienteId` for informado, nome/telefone vêm do cadastro (ver seção "Vínculo com cliente" abaixo). 409 se conflitar com outro agendamento/bloqueio do mesmo barbeiro. |
+| PUT | `/api/agendamentos/:id` | Sessão | `{ barbeiroId?, inicio?, status? }` — reagenda (recalcula `fim`, refaz a trava de conflito) e/ou muda status (`confirmado`\|`cancelado`\|`concluido`). Concluir gera lançamento financeiro automático (ver seção abaixo); reverter a conclusão remove o lançamento. Não existe `DELETE` — ver seção abaixo. |
 | GET | `/api/bloqueios?barbeiro_id=` | Sessão | Lista bloqueios; `barbeiro_id` opcional (filtra por barbeiro se informado). |
 | POST | `/api/bloqueios` | Sessão | `{ barbeiroId, inicio, fim, motivo? }` — 409 se conflitar com um agendamento ou outro bloqueio do mesmo barbeiro. |
 | DELETE | `/api/bloqueios/:id` | Sessão | Remove o bloqueio de verdade (não é soft delete — ver seção abaixo). |
+| GET | `/api/clientes?busca=` | Sessão | Lista/busca clientes; `busca` (opcional) filtra por nome ou telefone (`ILIKE`). |
+| POST | `/api/clientes` | Sessão | `{ nome, telefone, senha }` — cadastro feito pelo balcão/staff. 409 com `"Telefone já cadastrado."` se o telefone já existir (erro específico, não genérico — ver seção abaixo). |
+| PUT | `/api/clientes/:id` | Sessão | `{ nome?, telefone?, senha? }` — edita campos parciais. |
+| GET | `/api/financeiro/resumo?de=&ate=&barbeiro_id=` | Sessão | Total consolidado (`totalCentavos`) no período; todos os filtros são opcionais. Sem `barbeiro_id`, soma os dois sócios (visão, não repartição). |
+| GET | `/api/financeiro/lancamentos?de=&ate=&barbeiro_id=` | Sessão | Lista os lançamentos financeiros do período, mesmos filtros opcionais. |
 
 ## Horários sem fuso (`inicio`/`fim`)
 
@@ -138,6 +146,59 @@ acima), liberando o horário. Um `DELETE /api/agendamentos/:id` intencionalmente
 implementado. Bloqueio é diferente: não é dado financeiro nem histórico, é só uma marcação
 de indisponibilidade que deixou de existir — por isso `DELETE /api/bloqueios/:id` remove
 de verdade.
+
+## Vínculo de agendamento com cliente cadastrado (Fase 3)
+
+`POST /api/agendamentos` aceita `clienteId` opcional, além (ou em vez) de
+`nomeCliente`/`telefoneCliente`. Quando `clienteId` é informado, nome/telefone gravados no
+agendamento vêm **do cadastro** (`clientes`), não do que veio no corpo da requisição —
+mesmo que `nomeCliente`/`telefoneCliente` também tenham sido enviados, eles são ignorados
+nesse caso, para não gravar um contato desencontrado do cadastro real. Sem `clienteId`,
+`nomeCliente` e `telefoneCliente` continuam obrigatórios (contato avulso, comportamento da
+Fase 2 inalterado — o balcão pode criar um agendamento sem cadastrar cliente).
+
+O vínculo é **opcional e não retroativo**: agendamentos criados na Fase 2 (antes de
+`clienteId` existir) continuam com `clienteId = null` para sempre — não há nenhuma
+migração de dados para tentar casá-los com clientes cadastrados depois, conforme pedido
+explicitamente no escopo da Fase 3.
+
+Clientes são cadastrados pelo balcão/staff (rota protegida por login de sócio,
+`POST /api/clientes`) — não existe autoatendimento nesta fase (isso é Fase 4, com a
+página pública). Diferente do erro de login de sócio (regra 3 — propositalmente genérico),
+`POST /api/clientes` com telefone já cadastrado responde `409` com uma mensagem
+específica (`"Telefone já cadastrado."`): quem está cadastrando é o sócio no balcão, não o
+próprio cliente tentando adivinhar se um telefone alheio já tem conta, então não há o
+mesmo motivo para generalizar o erro.
+
+## Lançamento financeiro automático ao concluir um agendamento (Fase 3)
+
+Ao mudar o status de um agendamento para `concluido` (`PUT /api/agendamentos/:id`), uma
+linha é criada automaticamente em `lancamentos_financeiros`, copiando `barbeiro_id` e o
+`valor_cobrado_centavos` do agendamento (mesma lógica de cópia da regra 5 — o valor
+gravado é o que foi cobrado *daquele* agendamento, não o preço atual do serviço).
+
+**Decisão de comportamento** (pedida explicitamente pelo escopo da Fase 3, para o caso de
+o status de um agendamento concluído ser alternado): reverter o status de `concluido` para
+qualquer outro valor **remove** o lançamento correspondente — não fica um lançamento
+"órfão" referenciando um agendamento que não está mais concluído. Se o agendamento for
+concluído de novo depois, um novo lançamento é criado. Isso mantém
+`lancamentos_financeiros` sempre consistente com "agendamentos com status = concluido
+agora", ao custo de não preservar histórico de lançamentos que foram revertidos (não havia
+exigência de manter esse histórico no escopo desta fase — se isso vier a ser necessário,
+é uma mudança de modelagem futura, não desta fase).
+
+A não-duplicação (idempotência) é garantida por uma constraint `unique()` real em
+`lancamentos_financeiros.agendamento_id` — o `INSERT` usa `ON CONFLICT (agendamento_id) DO
+NOTHING`, não uma checagem "existe?" antes de inserir (que seria vulnerável a corrida sob
+concorrência, o mesmo motivo pelo qual a trava de conflito de horário da Fase 2 usa
+constraint de banco em vez de checagem na aplicação).
+
+`GET /api/financeiro/resumo` e `GET /api/financeiro/lancamentos` filtram por `de`/`ate`
+(datas `YYYY-MM-DD`, comparadas contra `lancamentos_financeiros.criado_em` em UTC — a
+barbearia é de local único, mesma simplificação de fuso da Fase 2) e por `barbeiro_id`
+opcional. Sem `barbeiro_id`, o resultado é o consolidado dos dois sócios — é visão, não
+repartição (decisão de negócio já fechada, seção 2 do `planejamento-geral.md`): o sistema
+não calcula nem armazena nenhuma divisão/comissão automática entre sócios.
 
 ## Comportamento de bootstrap (`registrar-socio`)
 
@@ -264,8 +325,42 @@ curl -i -b cookies.txt -X POST http://localhost:8787/api/agendamentos \
 # ^ 409 — cai dentro do bloqueio
 ```
 
+Fluxo de financeiro/cliente (Fase 3) — logado como sócio 1:
+
+```bash
+# 14. Cadastrar um cliente pelo balcão
+curl -i -b cookies.txt -X POST http://localhost:8787/api/clientes \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Cliente Fiel","telefone":"11955554444","senha":"senha-do-cliente-123"}'
+
+# 15. Buscar o cliente cadastrado
+curl -s -b cookies.txt "http://localhost:8787/api/clientes?busca=Fiel"
+
+# 16. Criar um agendamento vinculado ao cliente (ajuste :id conforme o passo 14)
+curl -i -b cookies.txt -X POST http://localhost:8787/api/agendamentos \
+  -H "Content-Type: application/json" \
+  -d '{"barbeiroId":1,"servicoId":1,"clienteId":1,"inicio":"2026-09-21 09:00"}'
+
+# 17. Concluir o agendamento (ajuste :id conforme o passo 16) — deve gerar lançamento financeiro
+curl -i -b cookies.txt -X PUT http://localhost:8787/api/agendamentos/2 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"concluido"}'
+
+# 18. Conferir o lançamento e o resumo consolidado
+curl -s -b cookies.txt "http://localhost:8787/api/financeiro/lancamentos"
+curl -s -b cookies.txt "http://localhost:8787/api/financeiro/resumo"
+curl -s -b cookies.txt "http://localhost:8787/api/financeiro/resumo?barbeiro_id=1"
+
+# 19. Reverter o status — o lançamento deve desaparecer
+curl -i -b cookies.txt -X PUT http://localhost:8787/api/agendamentos/2 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"confirmado"}'
+curl -s -b cookies.txt "http://localhost:8787/api/financeiro/lancamentos"
+```
+
 Ver a seção "Teste de concorrência real" abaixo para o teste específico de duas requisições
-simultâneas (feito com um script separado, não só `curl` sequencial).
+simultâneas (feito com um script separado, não só `curl` sequencial), e a seção seguinte
+para a verificação equivalente do fluxo financeiro/cliente.
 
 ## Teste de concorrência real (exclusion constraint)
 
@@ -305,6 +400,31 @@ Isso não substitui testar contra o Neon real antes do deploy (comportamento de 
 latência pode diferir), mas valida que a lógica da exclusion constraint e das demais
 constraints está correta contra um Postgres de verdade, não só na leitura do SQL.
 
+## Verificação do fluxo financeiro/cliente (Fase 3)
+
+O mesmo tipo de teste da seção anterior (Postgres real via `embedded-postgres`, arquivos
+de migração reais do repositório — agora `0000`+`0001`+`0002`) foi usado para validar o
+escopo da Fase 3:
+
+- Telefone duplicado em `clientes`: rejeitado pela constraint `clientes_telefone_unique`
+  (`code=23505`).
+- Agendamento criado com `cliente_id` respeitando a FK para `clientes`.
+- Concluir um agendamento (`status = 'concluido'`) e inserir o lançamento com
+  `ON CONFLICT (agendamento_id) DO NOTHING`: cria exatamente 1 lançamento com o valor
+  correto (copiado do agendamento).
+- Repetir a mesma inserção (simulando "concluir" de novo sem sair do estado): continua
+  exatamente 1 lançamento — idempotência confirmada pela constraint, não só pela lógica da
+  aplicação.
+- Reverter o status para `confirmado` e remover o lançamento (mesma lógica de
+  `editarAgendamento`): lançamento removido, contagem volta a 0.
+- Concluir de novo depois de revertido: cria um novo lançamento (não duplicado).
+- Dois barbeiros com lançamentos distintos: resumo consolidado soma os dois
+  (`8000` centavos), filtro `barbeiro_id=1` retorna só `5000`, `barbeiro_id=2` só `3000` —
+  confirma que o filtro por sócio e o consolidado calculam certo sem repartição
+  automática.
+
+Todos os cenários acima rodaram com sucesso contra o Postgres real embarcado.
+
 ## Documentos do projeto
 
 - [`planejamento-geral.md`](planejamento-geral.md) — histórico de decisões e mapa das
@@ -315,4 +435,6 @@ constraints está correta contra um Postgres de verdade, não só na leitura do 
 - [`01a-fase1-correcoes.md`](01a-fase1-correcoes.md) e
   [`01b-fase1-simplificar-bootstrap-socio.md`](01b-fase1-simplificar-bootstrap-socio.md) —
   correções pós-auditoria da Fase 1.
-- [`03-fase2-agenda.md`](03-fase2-agenda.md) — escopo desta fase (agenda).
+- [`03-fase2-agenda.md`](03-fase2-agenda.md) — escopo da Fase 2 (agenda).
+- [`04-fase3-financeiro-cliente.md`](04-fase3-financeiro-cliente.md) — escopo desta fase
+  (financeiro e cadastro de cliente).

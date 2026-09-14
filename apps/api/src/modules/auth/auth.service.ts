@@ -1,7 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { barbeiros, usuarios } from "../../db/schema";
-import { gerarHashSenha, verificarSenha } from "./senha.util";
+import { gerarHashSenha, verificarSenha } from "../../shared/senha/senha.util";
 import type { LoginInput, RegistrarSocioInput } from "./auth.schema";
 
 /** Número de sócios criados via `registrar-socio` antes do bootstrap se fechar. */

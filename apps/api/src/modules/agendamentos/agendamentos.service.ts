@@ -1,6 +1,7 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { Db, DbOuTx } from "../../db/client";
-import { agendamentos, barbeiros, servicos } from "../../db/schema";
+import { agendamentos, barbeiros, clientes, servicos } from "../../db/schema";
+import { criarLancamentoSeNecessario, removerLancamentoDeAgendamento } from "../financeiro/financeiro.service";
 import { inserirOcupacao, removerOcupacaoDeAgendamento } from "../../shared/ocupacao/ocupacao.util";
 import type { CriarAgendamentoInput, EditarAgendamentoInput } from "./agendamentos.schema";
 import { inicioDoDiaSeguinte, somarMinutos } from "./data.util";
@@ -16,6 +17,13 @@ export class ServicoInvalidoError extends Error {
   constructor() {
     super("Serviço não encontrado ou inativo.");
     this.name = "ServicoInvalidoError";
+  }
+}
+
+export class ClienteInvalidoError extends Error {
+  constructor() {
+    super("Cliente não encontrado.");
+    this.name = "ClienteInvalidoError";
   }
 }
 
@@ -69,6 +77,27 @@ export async function criarAgendamento(db: Db, dados: CriarAgendamentoInput) {
     throw new ServicoInvalidoError();
   }
 
+  // Se `clienteId` foi informado, nome/telefone vêm do cadastro — nunca do que foi
+  // digitado no corpo (evita gravar um nome/telefone desencontrado do cadastro real).
+  let nomeCliente = dados.nomeCliente;
+  let telefoneCliente = dados.telefoneCliente;
+  if (dados.clienteId !== undefined) {
+    const [cliente] = await db
+      .select({ nome: clientes.nome, telefone: clientes.telefone })
+      .from(clientes)
+      .where(eq(clientes.id, dados.clienteId))
+      .limit(1);
+    if (!cliente) {
+      throw new ClienteInvalidoError();
+    }
+    nomeCliente = cliente.nome;
+    telefoneCliente = cliente.telefone;
+  }
+  if (nomeCliente === undefined || telefoneCliente === undefined) {
+    // Inatingível se o Zod (criarAgendamentoSchema) validou antes — checagem defensiva.
+    throw new Error("nomeCliente/telefoneCliente ausentes sem clienteId.");
+  }
+
   const inicio = dados.inicio.length === 16 ? `${dados.inicio}:00` : dados.inicio;
   const fim = somarMinutos(inicio, servico.duracaoMinutos);
 
@@ -78,8 +107,9 @@ export async function criarAgendamento(db: Db, dados: CriarAgendamentoInput) {
       .values({
         barbeiroId: dados.barbeiroId,
         servicoId: dados.servicoId,
-        nomeCliente: dados.nomeCliente,
-        telefoneCliente: dados.telefoneCliente,
+        clienteId: dados.clienteId ?? null,
+        nomeCliente,
+        telefoneCliente,
         inicio,
         fim,
         valorCobradoCentavos: servico.valorCentavos,
@@ -122,6 +152,13 @@ async function buscarAgendamento(db: DbOuTx, id: number) {
  * Marcar como `cancelado` libera a ocupação (soft delete só na tabela `agendamentos` —
  * ver comentário em `db/schema.ts`); qualquer outro status (`confirmado`/`concluido`)
  * mantém/recria a ocupação — o horário continua "ocupado" para fins de trava/histórico.
+ *
+ * Também dispara o lançamento financeiro automático (Fase 3, ver `financeiro.service.ts`
+ * e o comentário em `db/schema.ts` sobre a decisão de comportamento): ao entrar em
+ * `concluido` vindo de outro status, cria o lançamento; ao sair de `concluido` para
+ * qualquer outro status, remove o lançamento correspondente. Alternar `concluido` →
+ * outro → `concluido` de novo simplesmente cria um novo lançamento (o antigo já foi
+ * removido na transição de saída) — sem duplicar, graças à constraint `unique()`.
  */
 export async function editarAgendamento(db: Db, id: number, dados: EditarAgendamentoInput) {
   return db.transaction(async (tx) => {
@@ -166,6 +203,16 @@ export async function editarAgendamento(db: Db, id: number, dados: EditarAgendam
     await removerOcupacaoDeAgendamento(tx, id);
     if (novoStatus !== "cancelado") {
       await inserirOcupacao(tx, { tipo: "agendamento", agendamentoId: id, barbeiroId, inicio, fim });
+    }
+
+    if (atual.status !== "concluido" && novoStatus === "concluido") {
+      await criarLancamentoSeNecessario(tx, {
+        agendamentoId: id,
+        barbeiroId,
+        valorCentavos: atualizado.valorCobradoCentavos,
+      });
+    } else if (atual.status === "concluido" && novoStatus !== "concluido") {
+      await removerLancamentoDeAgendamento(tx, id);
     }
 
     return atualizado;

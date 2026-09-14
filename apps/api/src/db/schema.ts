@@ -82,6 +82,24 @@ export const sessoes = pgTable("sessoes", {
 });
 
 /**
+ * Cliente final da barbearia — tabela própria, separada de `usuarios` (ver decisão
+ * registrada em `00-arquitetura-e-convencoes.md`, seção "Decisão em aberto: usuarios
+ * genérico vs. tabela própria para clientes": adotada a separação, justamente para não
+ * misturar contas administrativas com contas de usuário final numa mesma tabela).
+ * `telefoneVerificado` fica `false` até a Fase 4 implementar a verificação por WhatsApp
+ * sob demanda — nesta fase o cadastro é feito pelo balcão/staff, presencial, sem canal
+ * público ainda.
+ */
+export const clientes = pgTable("clientes", {
+  id: serial("id").primaryKey(),
+  nome: text("nome").notNull(),
+  telefone: text("telefone").notNull().unique(),
+  senhaHash: text("senha_hash").notNull(),
+  telefoneVerificado: boolean("telefone_verificado").notNull().default(false),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * `inicio`/`fim` usam `timestamp` **sem** timezone (`mode: "string"`, sem
  * `withTimezone`), de propósito: a barbearia opera num único fuso (horário local), sem
  * agendamento entre fusos diferentes, e a exclusion constraint de referência da regra 8
@@ -110,6 +128,12 @@ export const agendamentos = pgTable("agendamentos", {
   servicoId: integer("servico_id")
     .notNull()
     .references(() => servicos.id),
+  // Vínculo opcional com um cliente cadastrado (Fase 3) — não retroativo, não
+  // obrigatório: um agendamento pode continuar sendo só um contato avulso
+  // (`nomeCliente`/`telefoneCliente` preenchidos direto, sem `clienteId`). Quando
+  // `clienteId` é informado na criação, nome/telefone são preenchidos a partir do
+  // cadastro (ver `agendamentos.service.ts`), não digitados à mão.
+  clienteId: integer("cliente_id").references(() => clientes.id),
   nomeCliente: text("nome_cliente").notNull(),
   telefoneCliente: text("telefone_cliente").notNull(),
   inicio: timestamp("inicio", { mode: "string" }).notNull(),
@@ -160,4 +184,34 @@ export const ocupacoesBarbeiro = pgTable("ocupacoes_barbeiro", {
   tipo: text("tipo").notNull(),
   agendamentoId: integer("agendamento_id").references(() => agendamentos.id),
   bloqueioId: integer("bloqueio_id").references(() => bloqueiosAgenda.id),
+});
+
+/**
+ * Um lançamento por agendamento concluído, no máximo — `agendamentoId` é `unique()` de
+ * propósito: é essa constraint (não uma checagem na aplicação) que garante que alternar
+ * o status de um agendamento entre `concluido` e outro estado várias vezes nunca duplica
+ * o lançamento (ver `financeiro.service.ts`, que faz `INSERT ... ON CONFLICT DO NOTHING`
+ * nesse índice). `barbeiroId` e `valorCentavos` são copiados do agendamento no momento da
+ * conclusão — mesma lógica de cópia da regra 5 do documento de convenções — para permitir
+ * o filtro/soma por sócio sem precisar de join a cada consulta do dashboard.
+ *
+ * Decisão de comportamento (pedida explicitamente pelo escopo da Fase 3): se o status de
+ * um agendamento concluído for revertido para qualquer outro valor, o lançamento
+ * correspondente é **removido** (não fica um lançamento "órfão" referenciando um
+ * agendamento que não está mais concluído) — ver `agendamentos.service.ts`. Se depois for
+ * concluído de novo, um novo lançamento é criado. Isso mantém `lancamentos_financeiros`
+ * sempre consistente com "agendamentos com status = concluido agora", sem histórico de
+ * lançamentos revertidos — decisão documentada também no README.
+ */
+export const lancamentosFinanceiros = pgTable("lancamentos_financeiros", {
+  id: serial("id").primaryKey(),
+  agendamentoId: integer("agendamento_id")
+    .notNull()
+    .references(() => agendamentos.id)
+    .unique(),
+  barbeiroId: integer("barbeiro_id")
+    .notNull()
+    .references(() => barbeiros.id),
+  valorCentavos: integer("valor_centavos").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -4,6 +4,8 @@ import { agendamentosRoutes } from "./modules/agendamentos/agendamentos.routes";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { barbeirosRoutes } from "./modules/barbeiros/barbeiros.routes";
 import { bloqueiosRoutes } from "./modules/bloqueios/bloqueios.routes";
+import { clientesRoutes } from "./modules/clientes/clientes.routes";
+import { financeiroRoutes } from "./modules/financeiro/financeiro.routes";
 import { servicosRoutes } from "./modules/servicos/servicos.routes";
 import type { AppContexto } from "./shared/tipos";
 
@@ -31,6 +33,8 @@ app.route("/api/servicos", servicosRoutes);
 app.route("/api/barbeiros", barbeirosRoutes);
 app.route("/api/agendamentos", agendamentosRoutes);
 app.route("/api/bloqueios", bloqueiosRoutes);
+app.route("/api/clientes", clientesRoutes);
+app.route("/api/financeiro", financeiroRoutes);
 
 app.onError((erro, c) => {
   console.error(erro);

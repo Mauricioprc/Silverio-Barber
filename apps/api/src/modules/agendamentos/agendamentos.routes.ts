@@ -7,6 +7,7 @@ import { criarAgendamentoSchema, editarAgendamentoSchema, listarAgendamentosQuer
 import {
   AgendamentoNaoEncontradoError,
   BarbeiroInvalidoError,
+  ClienteInvalidoError,
   ServicoInvalidoError,
   criarAgendamento,
   editarAgendamento,
@@ -38,7 +39,7 @@ agendamentosRoutes.post("/", async (c) => {
     const agendamento = await criarAgendamento(c.get("db"), validacao.dados);
     return c.json({ agendamento }, 201);
   } catch (erro) {
-    if (erro instanceof BarbeiroInvalidoError || erro instanceof ServicoInvalidoError) {
+    if (erro instanceof BarbeiroInvalidoError || erro instanceof ServicoInvalidoError || erro instanceof ClienteInvalidoError) {
       return c.json({ erro: erro.message }, 400);
     }
     if (erro instanceof ConflitoHorarioError) {
