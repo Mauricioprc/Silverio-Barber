@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { criarDb } from "./db/client";
+import { agendamentosRoutes } from "./modules/agendamentos/agendamentos.routes";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { barbeirosRoutes } from "./modules/barbeiros/barbeiros.routes";
+import { bloqueiosRoutes } from "./modules/bloqueios/bloqueios.routes";
 import { servicosRoutes } from "./modules/servicos/servicos.routes";
 import type { AppContexto } from "./shared/tipos";
 
@@ -27,6 +29,8 @@ app.get("/api/saude", (c) => c.json({ ok: true }));
 app.route("/api/auth", authRoutes);
 app.route("/api/servicos", servicosRoutes);
 app.route("/api/barbeiros", barbeirosRoutes);
+app.route("/api/agendamentos", agendamentosRoutes);
+app.route("/api/bloqueios", bloqueiosRoutes);
 
 app.onError((erro, c) => {
   console.error(erro);
