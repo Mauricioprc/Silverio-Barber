@@ -5,7 +5,7 @@ import { z } from "zod";
  * informação de fuso — ver comentário em `db/schema.ts` sobre por que as colunas de
  * horário são `timestamp` sem timezone. Segundos são opcionais.
  */
-const horarioLocalSchema = z
+export const horarioLocalSchema = z
   .string()
   .regex(
     /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/,
@@ -32,6 +32,10 @@ export const criarAgendamentoSchema = z
     nomeCliente: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120).optional(),
     telefoneCliente: telefoneSchema.optional(),
     inicio: horarioLocalSchema,
+    // Regra 9 do documento de convenções — ver comentário em `db/schema.ts`. Omitido ou
+    // qualquer valor diferente de `true` é tratado como `false` (Zod já rejeita valores
+    // não-booleanos, então não há ambiguidade de "truthy" por string/número).
+    aceitaMensagensAutomaticas: z.boolean().optional(),
   })
   .refine((dados) => dados.clienteId !== undefined || (dados.nomeCliente !== undefined && dados.telefoneCliente !== undefined), {
     message: "Informe clienteId, ou nomeCliente e telefoneCliente.",

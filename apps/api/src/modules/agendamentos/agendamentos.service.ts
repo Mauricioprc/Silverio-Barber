@@ -1,6 +1,6 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { Db, DbOuTx } from "../../db/client";
-import { agendamentos, barbeiros, clientes, servicos } from "../../db/schema";
+import { agendamentos, barbeiros, clientes, servicos, usuarios } from "../../db/schema";
 import { criarLancamentoSeNecessario, removerLancamentoDeAgendamento } from "../financeiro/financeiro.service";
 import { inserirOcupacao, removerOcupacaoDeAgendamento } from "../../shared/ocupacao/ocupacao.util";
 import type { CriarAgendamentoInput, EditarAgendamentoInput } from "./agendamentos.schema";
@@ -113,6 +113,7 @@ export async function criarAgendamento(db: Db, dados: CriarAgendamentoInput) {
         inicio,
         fim,
         valorCobradoCentavos: servico.valorCentavos,
+        aceitaMensagensAutomaticas: dados.aceitaMensagensAutomaticas === true,
       })
       .returning();
 
@@ -223,4 +224,28 @@ export async function editarAgendamento(db: Db, id: number, dados: EditarAgendam
 function diferencaEmMinutos(inicio: string, fim: string): number {
   const paraData = (horario: string) => new Date(`${horario.replace(" ", "T")}Z`);
   return Math.round((paraData(fim).getTime() - paraData(inicio).getTime()) / 60_000);
+}
+
+/** Dados do agendamento + nomes de serviço/barbeiro, para montar a mensagem manual (Fase 4). */
+export async function obterDadosParaMensagem(db: Db, id: number) {
+  const [linha] = await db
+    .select({
+      nomeCliente: agendamentos.nomeCliente,
+      telefoneCliente: agendamentos.telefoneCliente,
+      inicio: agendamentos.inicio,
+      valorCobradoCentavos: agendamentos.valorCobradoCentavos,
+      nomeServico: servicos.nome,
+      nomeBarbeiro: usuarios.nome,
+    })
+    .from(agendamentos)
+    .innerJoin(servicos, eq(agendamentos.servicoId, servicos.id))
+    .innerJoin(barbeiros, eq(agendamentos.barbeiroId, barbeiros.id))
+    .innerJoin(usuarios, eq(barbeiros.usuarioId, usuarios.id))
+    .where(eq(agendamentos.id, id))
+    .limit(1);
+
+  if (!linha) {
+    throw new AgendamentoNaoEncontradoError();
+  }
+  return linha;
 }

@@ -1,13 +1,15 @@
 # Silvério Barbearia — Sistema de Gestão
 
-Monorepo do sistema de gestão da barbearia. Este repositório está na **Fase 3**
-(financeiro e cadastro de cliente): só a API (`apps/api`) existe — auth dos sócios, CRUD
-de serviços, cadastro de barbeiros/disponibilidade (Fase 1), agendamentos + bloqueios de
-agenda com trava de conflito de horário no próprio banco (Fase 2), e agora cadastro de
-cliente pelo balcão, vínculo opcional de agendamento a cliente, lançamento financeiro
-automático e dashboard consolidado/por sócio (Fase 3). Sem frontend, sem login de
-cliente/página pública, sem WhatsApp ainda (ver `planejamento-geral.md` para o mapa
-completo das fases).
+Monorepo do sistema de gestão da barbearia. Este repositório está na **Fase 4**
+(agendamento online + WhatsApp): só a API (`apps/api`) existe — auth dos sócios, CRUD de
+serviços, cadastro de barbeiros/disponibilidade (Fase 1), agendamentos + bloqueios de
+agenda com trava de conflito de horário no próprio banco (Fase 2), cadastro de cliente
+pelo balcão + lançamento financeiro automático (Fase 3), e agora cadastro/login público
+de cliente, verificação de telefone por WhatsApp com rate-limiting, página pública de
+agendamento (rotas de API) e confirmação/lembrete automático via WhatsApp — com opt-in
+explícito e uma implementação mock de WhatsApp para desenvolver sem depender da aprovação
+da Meta (Fase 4). Sem frontend ainda (ver `planejamento-geral.md` para o mapa completo
+das fases).
 
 Stack: Cloudflare Workers (Hono) + Neon Postgres (Drizzle ORM) + Zod. Detalhe completo e
 justificativas em [`00-arquitetura-e-convencoes.md`](00-arquitetura-e-convencoes.md).
@@ -55,6 +57,11 @@ atributo `Secure` não impede o `curl` de enviar/receber.
 | `DATABASE_URL` | `.dev.vars` (local) / `wrangler secret put DATABASE_URL` (produção) | String de conexão Neon (Postgres). |
 | `SESSAO_SECRETO` | `.dev.vars` (local) / `wrangler secret put SESSAO_SECRETO` (produção) | Segredo usado para assinar o cookie de sessão. |
 | `AMBIENTE` | `wrangler.toml` (`[vars]`) | Não sensível, informativo (`desenvolvimento`/`producao`). |
+| `WHATSAPP_MODO` | `wrangler.toml` (`[vars]`) ou `.dev.vars` | `"mock"` (padrão, inclusive se a variável não existir) ou `"real"`. Ver seção "EnviadorWhatsapp" abaixo. |
+| `WHATSAPP_TOKEN` | `.dev.vars` (local) / `wrangler secret put WHATSAPP_TOKEN` (produção) | Token de acesso da WhatsApp Cloud API. Só exigido com `WHATSAPP_MODO=real`. |
+| `WHATSAPP_PHONE_NUMBER_ID` | `.dev.vars` (local) / `wrangler secret put WHATSAPP_PHONE_NUMBER_ID` (produção) | Id do número de telefone configurado na Cloud API. Só exigido com `WHATSAPP_MODO=real`. |
+| `WHATSAPP_TEMPLATE_CONFIRMACAO` | `wrangler.toml` (`[vars]`) | Nome do template aprovado pela Meta para a confirmação automática. Sem essa variável, usa `"confirmacao_agendamento"` (só funciona de verdade depois que esse nome for aprovado e configurado). |
+| `WHATSAPP_TEMPLATE_LEMBRETE` | `wrangler.toml` (`[vars]`) | Nome do template aprovado para o lembrete automático. Sem essa variável, usa `"lembrete_agendamento"`. |
 
 **Nunca** commitar `DATABASE_URL` ou `SESSAO_SECRETO` — `.dev.vars` e `.env` já estão no
 `.gitignore`. Em produção, configure via `wrangler secret put <NOME>`, nunca em
@@ -90,6 +97,17 @@ obtido via `/api/auth/login`.
 | PUT | `/api/clientes/:id` | Sessão | `{ nome?, telefone?, senha? }` — edita campos parciais. |
 | GET | `/api/financeiro/resumo?de=&ate=&barbeiro_id=` | Sessão | Total consolidado (`totalCentavos`) no período; todos os filtros são opcionais. Sem `barbeiro_id`, soma os dois sócios (visão, não repartição). |
 | GET | `/api/financeiro/lancamentos?de=&ate=&barbeiro_id=` | Sessão | Lista os lançamentos financeiros do período, mesmos filtros opcionais. |
+| GET | `/api/agendamentos/:id/link-whatsapp` | Sessão | Devolve `{ url }` — link `wa.me` pronto (item 5 da Fase 4, botão de envio manual). Não depende de `EnviadorWhatsapp`. |
+| POST | `/api/interno/lembretes/enviar` | Sessão | Dispara "agora" os lembretes de agendamentos confirmados de amanhã com opt-in (ver seção de lembrete abaixo) — acionado manualmente por um sócio nesta fase; um cron real (Fase 5+) chamaria a mesma lógica. |
+| POST | `/api/publico/clientes/cadastro` | Nenhuma | `{ nome, telefone, senha }` — cadastro público. Se o telefone já existir em `clientes` (balcão, Fase 3), vincula à conta em vez de duplicar. Seta cookie de sessão de cliente. |
+| POST | `/api/publico/clientes/login` | Nenhuma | `{ telefone, senha }` — mesma lógica de sessão persistente (30 dias) do login de sócio, cookie próprio de cliente. |
+| POST | `/api/publico/clientes/logout` | Sessão de cliente | Encerra a sessão do cliente. |
+| POST | `/api/publico/clientes/verificacao/enviar` | Sessão de cliente | Gera e envia (via `EnviadorWhatsapp`) um código de 6 dígitos para o telefone **do cliente da sessão** (nunca de um telefone informado no corpo). Rate-limit da regra 7 — ver seção abaixo; `429` com `Retry-After` se excedido. |
+| POST | `/api/publico/clientes/verificacao/confirmar` | Sessão de cliente | `{ codigo }` — confirma o código mais recente; marca `telefone_verificado = true`. Erro genérico (`400`) se errado/expirado/já usado. |
+| GET | `/api/publico/servicos` | Nenhuma | Lista serviços ativos — vitrine da página pública. |
+| GET | `/api/publico/barbeiros` | Nenhuma | Lista barbeiros ativos (só `id`+`nome` — sem telefone, que é dado interno). |
+| GET | `/api/publico/disponibilidade?barbeiro_id=&data=` | Nenhuma | Horários livres do dia, cruzando `disponibilidade_barbeiro` com `ocupacoes_barbeiro`. |
+| POST | `/api/publico/agendamentos` | Sessão de cliente | `{ barbeiroId, servicoId, inicio, aceitaMensagensAutomaticas? }` — exige `telefone_verificado = true` (`403` com `precisaVerificar: true` se não estiver); mesma trava de conflito da Fase 2. `clienteId` vem sempre da sessão. |
 
 ## Horários sem fuso (`inicio`/`fim`)
 
@@ -200,10 +218,144 @@ Brasília, UTC-3 fixo, já que o Brasil aboliu o horário de verão em 2019) e p
 sem timezone), `lancamentos_financeiros.criado_em` é um instante real (`timestamp with
 time zone`), então o filtro converte a fronteira do dia local para UTC explicitamente
 (meia-noite em Brasília = `03:00 UTC`, não `00:00 UTC`) — ver
-`modules/financeiro/fuso.util.ts`. Sem `barbeiro_id`, o resultado é o consolidado dos
-dois sócios — é visão, não
-repartição (decisão de negócio já fechada, seção 2 do `planejamento-geral.md`): o sistema
-não calcula nem armazena nenhuma divisão/comissão automática entre sócios.
+`shared/fuso/fuso.util.ts` (movido de `modules/financeiro/` na Fase 4, quando o módulo
+`lembretes` passou a precisar da mesma conversão). Sem `barbeiro_id`, o resultado é o
+consolidado dos dois sócios — é visão, não repartição (decisão de negócio já fechada,
+seção 2 do `planejamento-geral.md`): o sistema não calcula nem armazena nenhuma
+divisão/comissão automática entre sócios.
+
+## `EnviadorWhatsapp`: mock vs. real (Fase 4)
+
+Todo envio de WhatsApp passa pela interface `EnviadorWhatsapp`
+(`shared/whatsapp/enviador-whatsapp.ts`), nunca chamado direto — porque a aprovação da
+conta comercial da Meta e a contratação do provedor/BSP têm prazo próprio e podem não
+estar prontos quando este código roda (ver `05-fase4-agendamento-online-whatsapp.md`).
+
+- **`EnviadorWhatsappMock`** (padrão — usado sempre que `WHATSAPP_MODO` não é
+  exatamente `"real"`, inclusive se a variável não existir): não faz nenhuma chamada de
+  rede, só loga a mensagem (`console.log`) e guarda em `mensagensEnviadas` (útil para
+  testes). Com isso, todo o resto do fluxo (cadastro, verificação, rate-limiting,
+  agendamento, opt-in) funciona e é testável sem depender da Meta.
+- **`EnviadorWhatsappMetaCloudApi`** (`WHATSAPP_MODO=real`): chama a WhatsApp Cloud API
+  da Meta (`graph.facebook.com`) diretamente via `fetch`. Se o BSP contratado expuser uma
+  API diferente da Cloud API direta, troque só esta classe — a interface
+  `EnviadorWhatsapp` (e todo o resto do código que a usa) não muda.
+
+**Checklist para ligar o `EnviadorWhatsapp` real em produção**:
+
+1. Conta comercial WhatsApp aprovada pela Meta, com o número de telefone configurado.
+2. Template(s) de mensagem aprovados — um para confirmação, outro para lembrete (duas
+   aprovações separadas da conta em si, com prazos próprios — ver
+   `planejamento-geral.md`). Anote os nomes exatos aprovados.
+3. Confirmar com o provedor/BSP escolhido se ele suporta "Coexistência" (permite manter
+   o app comum do WhatsApp Business no celular de quem atende, em paralelo à API — ver
+   nota operacional no fim de `05-fase4-agendamento-online-whatsapp.md`); se sim, o app
+   precisa ser aberto pelo menos 1x por semana, ou a API desconecta.
+4. Configurar via `wrangler secret put`: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
+5. Configurar em `wrangler.toml` (`[vars]`, não sensível): `WHATSAPP_MODO=real`,
+   `WHATSAPP_TEMPLATE_CONFIRMACAO=<nome aprovado>`, `WHATSAPP_TEMPLATE_LEMBRETE=<nome
+   aprovado>`.
+6. Testar manualmente um envio de cada tipo (verificação, confirmação, lembrete) antes
+   de considerar em produção de verdade.
+
+## Verificação de telefone por WhatsApp e rate-limiting (regra 7)
+
+`POST /api/publico/clientes/verificacao/enviar` gera um código de 6 dígitos (hash SHA-256
+gravado, nunca texto puro — `codigos_verificacao.codigo_hash`), válido por 10 minutos, e
+envia via `EnviadorWhatsapp` para o telefone **do cliente da sessão** — a rota nunca
+aceita um telefone vindo do corpo da requisição, de propósito: aceitar um telefone
+arbitrário no corpo transformaria essa rota numa forma de mandar WhatsApp de graça (às
+custas da barbearia) pra qualquer número, sem nenhuma conta por trás. Isso é uma decisão
+de segurança além do que o prompt da Fase 4 pediu literalmente, mas segue diretamente do
+motivo da própria regra 7 ("cada envio custa dinheiro real via Meta").
+
+**Limites aplicados** (`modules/verificacao/verificacao.service.ts`):
+
+- No máximo **3 envios por cliente a cada 15 minutos** (regra 7).
+- **Backoff crescente** entre envios consecutivos do mesmo cliente: o 1º envio na janela
+  é livre; o 2º exige pelo menos **60s** desde o anterior; o 3º exige pelo menos **180s**
+  desde o anterior. A partir do 4º dentro da janela de 15 min, bloqueado até o envio mais
+  antigo sair da janela.
+- Limite complementar de **10 envios por IP a cada 15 minutos** (regra 7) — mais frouxo,
+  só dificulta abuso via vários telefones/contas a partir da mesma origem; o limite por
+  cliente é a defesa principal. IP obtido de `CF-Connecting-IP` (populado pela Cloudflare,
+  mais confiável que `X-Forwarded-For`).
+- Excedido qualquer limite, a resposta é `429` com `{ erro, retryAfterSegundos }` e header
+  `Retry-After` — nenhum código é gerado nem mensagem enviada.
+
+**Teste real do rate-limiting** (pedido explicitamente no critério de pronto da Fase 4):
+como o driver `@neondatabase/serverless` só fala com o proxy da Neon (não com Postgres
+genérico — mesma limitação já documentada nas fases anteriores), o teste foi feito
+reimplementando a lógica de `enviarCodigoVerificacao` fielmente em SQL puro contra um
+Postgres 18.4 real (`embedded-postgres`), com as migrações reais do repositório aplicadas,
+disparando 4 tentativas em sequência controlada para o mesmo cliente:
+
+| Tentativa | Tempo decorrido | Resultado |
+|---|---|---|
+| 1ª | t=0s | **Aceita** |
+| 2ª | t=5s (< 60s exigidos) | Rejeitada (backoff) |
+| 2ª (retry) | t=65s (≥ 60s) | **Aceita** |
+| 3ª | t=95s (< 180s exigidos desde a 2ª) | Rejeitada (backoff) |
+| 3ª (retry) | t=275s (≥ 180s) | **Aceita** |
+| 4ª | dentro dos 15 min, já 3 aceitas | **Rejeitada** (limite de janela) |
+
+Resultado: exatamente 3 códigos gravados no banco, a 4ª tentativa (e as duas tentativas
+prematuras) corretamente rejeitadas — confirmado consultando `codigos_verificacao`
+diretamente, não assumido pela leitura do código. O mesmo teste confirmou também: código
+correto marca `telefone_verificado = true`; reusar um código já confirmado falha (`usado_
+em` preenchido); cadastro público com telefone já existente em `clientes` (Fase 3, balcão)
+atualiza o registro existente em vez de duplicar.
+
+## Opt-in de mensagem automática (regra 9)
+
+`aceitaMensagensAutomaticas` é um campo booleano **por agendamento** (coluna em
+`agendamentos`, não uma preferência permanente em `clientes`) — decisão de modelagem da
+Fase 4: consentimento por agendamento é a leitura mais segura de "nunca inferir
+consentimento implicitamente", permite que o cliente consinta num agendamento específico
+sem que isso valha para todos os futuros, e deixa claro no histórico exatamente para qual
+agendamento o consentimento valeu.
+
+`default(false)`: omitir o campo, ou mandar qualquer valor que não seja exatamente `true`
+(Zod já rejeita não-booleanos), é tratado como **não** consentiu — nunca assumido `true`
+por omissão. Só quando `true` é enviado explicitamente é que
+`POST /api/publico/agendamentos` dispara a mensagem de confirmação automática via
+`EnviadorWhatsapp`. Agendamentos criados pelo balcão (`POST /api/agendamentos`, sócio
+logado) também aceitam o campo (mesma coluna), mas normalmente ficam `false` — regra 9
+é sobre o canal público, mas uma única coluna cobre os dois casos sem duplicar schema.
+
+## Lembrete automático (função testável isoladamente)
+
+`modules/lembretes/lembretes.service.ts` expõe `obterAgendamentosParaLembrete(db, agora)`
+— uma função pura de leitura que decide "quem precisa de lembrete agora": agendamentos
+`confirmado` do dia seguinte (calculado em horário de Brasília a partir de `agora`) com
+`aceitaMensagensAutomaticas = true`. Separada de `enviarLembretes` (que de fato chama
+`EnviadorWhatsapp` para cada um), conforme pedido no escopo da Fase 4 — o mecanismo de
+disparo automático (cron do Workers ou equivalente) **não** foi implementado nesta fase;
+por enquanto, `POST /api/interno/lembretes/enviar` (protegida por login de sócio) aciona
+manualmente. Ligar um cron de verdade (Fase 5+) é só chamar essa mesma rota (ou a função
+`enviarLembretes` diretamente) periodicamente.
+
+## Botão de envio manual (`wa.me`) — independente da automação
+
+`GET /api/agendamentos/:id/link-whatsapp` (protegida por login de sócio, na visão de
+agenda) devolve `{ url }` pronta para abrir — item 5 da Fase 4. A montagem da mensagem/URL
+é uma função pura (`modules/agendamentos/mensagemManual.util.ts`, sem chamada de rede) que
+não depende de `EnviadorWhatsapp`, do rate-limiting (regra 7) nem do opt-in (regra 9): é o
+sócio mandando manualmente, revisando/personalizando antes de clicar enviar no WhatsApp
+Web/app dele — a regra 9 só vale para o envio *automático*. Continua funcionando mesmo com
+`EnviadorWhatsapp` em modo mock/sem credenciais reais, e continua disponível depois que a
+automação estiver funcionando — não é uma etapa transitória, é uma alternativa permanente
+(decisão de produto registrada em `planejamento-geral.md`).
+
+## Vínculo automático de cliente pré-cadastrado (cadastro público)
+
+`POST /api/publico/clientes/cadastro` verifica se o telefone já existe em `clientes`
+(cadastro feito pelo balcão na Fase 3, com uma senha que o próprio cliente não conhece).
+Se existir, **vincula à conta existente**: atualiza `nome` e `senhaHash` com o que o
+cliente acabou de informar (agora ele consegue logar de verdade), em vez de tentar criar
+um segundo registro — o que violaria a constraint única de telefone e, pior, criaria duas
+contas para a mesma pessoa. Resposta `200` nesse caso (vs. `201` para cadastro novo de
+verdade), com `{ clienteId, vinculado: true }`.
 
 ## Comportamento de bootstrap (`registrar-socio`)
 
@@ -363,9 +515,61 @@ curl -i -b cookies.txt -X PUT http://localhost:8787/api/agendamentos/2 \
 curl -s -b cookies.txt "http://localhost:8787/api/financeiro/lancamentos"
 ```
 
+Fluxo público de cliente (Fase 4) — sem sessão de sócio, cookie próprio de cliente
+(`cookies-cliente.txt`):
+
+```bash
+# 20. Cadastro público — se "11955554444" já existir em clientes (balcão), vincula em
+#     vez de duplicar
+curl -i -c cookies-cliente.txt -X POST http://localhost:8787/api/publico/clientes/cadastro \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Cliente Publico","telefone":"11955554444","senha":"senha-do-cliente-123"}'
+
+# 21. Ver a vitrine pública (sem login)
+curl -s http://localhost:8787/api/publico/servicos
+curl -s http://localhost:8787/api/publico/barbeiros
+curl -s "http://localhost:8787/api/publico/disponibilidade?barbeiro_id=1&data=2026-09-20"
+
+# 22. Tentar agendar sem telefone verificado -> 403 com precisaVerificar:true
+curl -i -b cookies-cliente.txt -X POST http://localhost:8787/api/publico/agendamentos \
+  -H "Content-Type: application/json" \
+  -d '{"barbeiroId":1,"servicoId":1,"inicio":"2026-09-20 11:00","aceitaMensagensAutomaticas":true}'
+
+# 23. Enviar código de verificação (vai pro log do wrangler dev — EnviadorWhatsappMock)
+curl -i -b cookies-cliente.txt -X POST http://localhost:8787/api/publico/clientes/verificacao/enviar
+
+# 24. Confirmar com o código visto no log (ajuste o valor)
+curl -i -b cookies-cliente.txt -X POST http://localhost:8787/api/publico/clientes/verificacao/confirmar \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"123456"}'
+
+# 25. Agora o agendamento público funciona, e com opt-in dispara a confirmação (mock)
+curl -i -b cookies-cliente.txt -X POST http://localhost:8787/api/publico/agendamentos \
+  -H "Content-Type: application/json" \
+  -d '{"barbeiroId":1,"servicoId":1,"inicio":"2026-09-20 11:00","aceitaMensagensAutomaticas":true}'
+
+# 26. 4 tentativas rápidas de reenvio de código -> a 4ª deve vir 429 (ver seção de
+#     rate-limiting abaixo para o teste feito contra Postgres real)
+for i in 1 2 3 4; do
+  curl -s -o /dev/null -w "tentativa $i: %{http_code}\n" -b cookies-cliente.txt \
+    -X POST http://localhost:8787/api/publico/clientes/verificacao/enviar
+done
+```
+
+Fluxo de sócio (link manual e lembretes) — logado como sócio:
+
+```bash
+# 27. Link wa.me pronto pra um agendamento (ajuste :id)
+curl -s -b cookies.txt "http://localhost:8787/api/agendamentos/2/link-whatsapp"
+
+# 28. Disparar lembretes manualmente (agendamentos confirmados de amanhã com opt-in)
+curl -i -b cookies.txt -X POST http://localhost:8787/api/interno/lembretes/enviar
+```
+
 Ver a seção "Teste de concorrência real" abaixo para o teste específico de duas requisições
-simultâneas (feito com um script separado, não só `curl` sequencial), e a seção seguinte
-para a verificação equivalente do fluxo financeiro/cliente.
+simultâneas (feito com um script separado, não só `curl` sequencial), e as seções
+seguintes para a verificação equivalente do fluxo financeiro/cliente e do rate-limiting da
+Fase 4.
 
 ## Teste de concorrência real (exclusion constraint)
 
@@ -430,6 +634,39 @@ escopo da Fase 3:
 
 Todos os cenários acima rodaram com sucesso contra o Postgres real embarcado.
 
+## Verificação da Fase 4 (rate-limiting, verificação, opt-in)
+
+Mesma técnica das seções anteriores — Postgres 18.4 real via `embedded-postgres`,
+migrações `0000`..`0003` reais do repositório aplicadas —, agora validando:
+
+- **Rate-limiting (regra 7)**: o teste detalhado na seção "Verificação de telefone por
+  WhatsApp e rate-limiting" acima — 4 tentativas em sequência controlada, exatamente 3
+  aceitas (respeitando o backoff crescente de 60s/180s) e a 4ª rejeitada por limite de
+  janela, confirmado consultando `codigos_verificacao` diretamente.
+- **Vínculo automático de cadastro público**: telefone já existente em `clientes`
+  (simulando um cliente do balcão da Fase 3) — a lógica de "atualiza em vez de duplicar"
+  mantém exatamente 1 registro com esse telefone, com o nome atualizado para o que o
+  cliente acabou de informar.
+- **Confirmação de código**: código certo marca `telefone_verificado = true`; o mesmo
+  código não pode ser confirmado uma segunda vez (`usado_em` já preenchido — código de
+  uso único).
+- **Opt-in (regra 9)**: um agendamento criado com `aceita_mensagens_automaticas = true`
+  explícito grava `true`; um agendamento sem o campo grava `false` (o `DEFAULT` da
+  coluna) — confirmando que a ausência do campo nunca é tratada como consentimento.
+- **Disponibilidade pública**: dados de `disponibilidade_barbeiro` +
+  `ocupacoes_barbeiro` prontos e corretos para o cálculo (a lógica pura de subtração de
+  intervalos, `disponibilidade.util.ts`, foi testada isoladamente à parte, com Node puro
+  — sem precisar de banco, já que não toca em SQL).
+- A montagem do link `wa.me` (`mensagemManual.util.ts`) e o `EnviadorWhatsappMock`
+  também foram exercitados isoladamente (via `tsx`, sem banco): a URL gerada decodifica
+  para a mensagem esperada, com o telefone normalizado para o formato internacional
+  (`55` + DDD + número), e o mock registra corretamente o que "enviaria".
+
+Não foi possível (nem seria correto tentar, sem credenciais reais) testar
+`EnviadorWhatsappMetaCloudApi` contra a API de verdade da Meta — isso só pode ser
+validado depois que a conta comercial e o template estiverem aprovados, seguindo o
+checklist da seção "`EnviadorWhatsapp`: mock vs. real" acima.
+
 ## Documentos do projeto
 
 - [`planejamento-geral.md`](planejamento-geral.md) — histórico de decisões e mapa das
@@ -441,5 +678,7 @@ Todos os cenários acima rodaram com sucesso contra o Postgres real embarcado.
   [`01b-fase1-simplificar-bootstrap-socio.md`](01b-fase1-simplificar-bootstrap-socio.md) —
   correções pós-auditoria da Fase 1.
 - [`03-fase2-agenda.md`](03-fase2-agenda.md) — escopo da Fase 2 (agenda).
-- [`04-fase3-financeiro-cliente.md`](04-fase3-financeiro-cliente.md) — escopo desta fase
+- [`04-fase3-financeiro-cliente.md`](04-fase3-financeiro-cliente.md) — escopo da Fase 3
   (financeiro e cadastro de cliente).
+- [`05-fase4-agendamento-online-whatsapp.md`](05-fase4-agendamento-online-whatsapp.md) —
+  escopo desta fase (agendamento online + WhatsApp).

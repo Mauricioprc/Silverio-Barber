@@ -140,6 +140,18 @@ export const agendamentos = pgTable("agendamentos", {
   fim: timestamp("fim", { mode: "string" }).notNull(),
   status: text("status").notNull().default("confirmado"),
   valorCobradoCentavos: integer("valor_cobrado_centavos").notNull(),
+  // Opt-in explícito (regra 9 do documento de convenções), capturado no momento da
+  // criação de CADA agendamento público — não é uma preferência global e permanente do
+  // cliente em `clientes`. Decisão de modelagem (Fase 4): consentimento por agendamento,
+  // não por conta, é a leitura mais segura de "não inferir consentimento implicitamente"
+  // — um cliente pode querer confirmação automática de um agendamento específico e não
+  // de outro, e fica claro no histórico exatamente para qual agendamento o consentimento
+  // valeu. `default(false)` é proposital: sem o campo vir explicitamente `true` no corpo
+  // da requisição (`publico.schema.ts` exige boolean, não aceita ausência como opt-in),
+  // nunca dispara mensagem automática. Agendamentos criados pelo balcão (Fases 1-3, sem
+  // `clienteId` ou por um sócio) sempre ficam `false` — regra 9 só vale pro canal
+  // público, mas manter `false` como default cobre os dois casos com uma única coluna.
+  aceitaMensagensAutomaticas: boolean("aceita_mensagens_automaticas").notNull().default(false),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -213,5 +225,50 @@ export const lancamentosFinanceiros = pgTable("lancamentos_financeiros", {
     .notNull()
     .references(() => barbeiros.id),
   valorCentavos: integer("valor_centavos").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Sessão de **cliente** — tabela própria, deliberadamente separada de `sessoes` (que é
+ * só de sócio/usuário administrativo). Reaproveitar a mesma tabela misturaria dois
+ * contextos de autorização completamente diferentes (acesso administrativo total vs.
+ * acesso restrito ao próprio histórico) atrás de um único nome de coluna/cookie — mesmo
+ * raciocínio já registrado em `00-arquitetura-e-convencoes.md` para a separação
+ * `usuarios`/`clientes`. Ver `shared/sessao/sessao-cliente.util.ts`.
+ */
+export const sessoesCliente = pgTable("sessoes_cliente", {
+  id: text("id").primaryKey(),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
+});
+
+/**
+ * Código de verificação de telefone por WhatsApp (regra 7 do documento de convenções —
+ * rate-limiting obrigatório). Cada linha é **uma tentativa de envio**, não um "código
+ * atual" substituído — é a contagem de linhas recentes por `clienteId`/`ip` que
+ * implementa o limite (ver `verificacao.service.ts`), não um contador separado. Guardar
+ * o histórico completo de tentativas (mesmo expiradas/erradas) também ajuda a auditar
+ * abuso depois.
+ *
+ * `codigoHash` — nunca o código em texto puro (mesmo raciocínio da regra 1 para senha:
+ * o valor não precisa estar em texto puro em lugar nenhum para ser útil, e reduz o dano
+ * de um vazamento de banco). Hash simples (SHA-256, ver `verificacao.util.ts`) é
+ * suficiente aqui — diferente de senha, o código é numérico curto, de uso único e expira
+ * em minutos; o custo de um PBKDF2 com milhares de iterações não compra proteção real
+ * adicional nesse cenário (o rate-limiting da regra 7 é a defesa real contra
+ * força-bruta, não o custo do hash).
+ */
+export const codigosVerificacao = pgTable("codigos_verificacao", {
+  id: serial("id").primaryKey(),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id),
+  ip: text("ip").notNull(),
+  codigoHash: text("codigo_hash").notNull(),
+  expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
+  usadoEm: timestamp("usado_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });

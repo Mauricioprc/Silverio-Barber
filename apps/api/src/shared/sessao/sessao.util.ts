@@ -1,17 +1,10 @@
 import { and, eq, gt } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { sessoes } from "../../db/schema";
+import { gerarTokenOpaco } from "./token.util";
 
 export const NOME_COOKIE_SESSAO = "silverio_sessao";
 export const DURACAO_SESSAO_DIAS = 30;
-
-function gerarTokenSessao(): string {
-  // Token opaco de 256 bits, aleatório e criptograficamente seguro (Web Crypto — nativo
-  // do runtime de Workers), codificado em base64url para uso direto como valor de cookie.
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 
 function calcularExpiracao(): Date {
   const expiraEm = new Date();
@@ -21,7 +14,7 @@ function calcularExpiracao(): Date {
 
 /** Cria uma sessão persistida no banco para o usuário e devolve o token a colocar no cookie. */
 export async function criarSessao(db: Db, usuarioId: number): Promise<{ token: string; expiraEm: Date }> {
-  const token = gerarTokenSessao();
+  const token = gerarTokenOpaco();
   const expiraEm = calcularExpiracao();
 
   await db.insert(sessoes).values({

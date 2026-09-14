@@ -12,7 +12,9 @@ import {
   criarAgendamento,
   editarAgendamento,
   listarAgendamentosDoDia,
+  obterDadosParaMensagem,
 } from "./agendamentos.service";
+import { montarLinkWhatsapp } from "./mensagemManual.util";
 
 export const agendamentosRoutes = new Hono<AppContexto>();
 
@@ -68,6 +70,25 @@ agendamentosRoutes.put("/:id", async (c) => {
     }
     if (erro instanceof ConflitoHorarioError) {
       return c.json({ erro: erro.message }, 409);
+    }
+    throw erro;
+  }
+});
+
+// Item 5 da Fase 4 — botão de envio manual, independente de EnviadorWhatsapp/regra
+// 7/regra 9 (ver mensagemManual.util.ts). Devolve só a URL pronta; abrir o link é
+// responsabilidade do frontend.
+agendamentosRoutes.get("/:id/link-whatsapp", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ erro: "Id inválido." }, 400);
+
+  try {
+    const dados = await obterDadosParaMensagem(c.get("db"), id);
+    const url = montarLinkWhatsapp(dados);
+    return c.json({ url });
+  } catch (erro) {
+    if (erro instanceof AgendamentoNaoEncontradoError) {
+      return c.json({ erro: erro.message }, 404);
     }
     throw erro;
   }

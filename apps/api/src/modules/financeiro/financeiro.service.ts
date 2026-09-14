@@ -2,7 +2,7 @@ import { and, eq, gte, lt, sum } from "drizzle-orm";
 import type { DbOuTx, Db } from "../../db/client";
 import { lancamentosFinanceiros } from "../../db/schema";
 import type { FiltroFinanceiroInput } from "./financeiro.schema";
-import { inicioDoDiaBrasiliaUtc, inicioDoDiaSeguinteBrasiliaUtc } from "./fuso.util";
+import { inicioDoDiaBrasiliaUtc, inicioDoDiaSeguinteBrasiliaUtc } from "../../shared/fuso/fuso.util";
 
 type NovoLancamento = {
   agendamentoId: number;
