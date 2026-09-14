@@ -22,10 +22,10 @@ Edite `apps/api/.dev.vars` com:
 
 - `DATABASE_URL`: string de conexão do seu projeto Neon de **desenvolvimento** (não o de
   produção). Formato: `postgresql://usuario:senha@ep-exemplo.regiao.aws.neon.tech/banco?sslmode=require`.
-- `SESSAO_SECRETO`: qualquer valor aleatório forte (ex.: `openssl rand -base64 48`). Não é
-  usado para assinar o cookie nesta fase (a sessão é validada por token opaco persistido
-  no banco — ver `apps/api/src/shared/sessao/sessao.util.ts`), mas já fica reservado nos
-  bindings para uso futuro (ex.: assinar outros tokens).
+- `SESSAO_SECRETO`: qualquer valor aleatório forte (ex.: `openssl rand -base64 48`). Usado
+  para assinar o cookie de sessão (`setSignedCookie`/`getSignedCookie` do Hono) — além do
+  token opaco em si já ser validado contra a tabela `sessoes` no banco, a assinatura
+  impede que o valor do cookie seja adulterado no cliente sem invalidar a assinatura.
 
 Aplique a migração no banco de desenvolvimento:
 
@@ -49,7 +49,7 @@ atributo `Secure` não impede o `curl` de enviar/receber.
 | Variável | Onde configurar | Descrição |
 |---|---|---|
 | `DATABASE_URL` | `.dev.vars` (local) / `wrangler secret put DATABASE_URL` (produção) | String de conexão Neon (Postgres). |
-| `SESSAO_SECRETO` | `.dev.vars` (local) / `wrangler secret put SESSAO_SECRETO` (produção) | Segredo reservado para uso futuro em tokens assinados. |
+| `SESSAO_SECRETO` | `.dev.vars` (local) / `wrangler secret put SESSAO_SECRETO` (produção) | Segredo usado para assinar o cookie de sessão. |
 | `AMBIENTE` | `wrangler.toml` (`[vars]`) | Não sensível, informativo (`desenvolvimento`/`producao`). |
 
 **Nunca** commitar `DATABASE_URL` ou `SESSAO_SECRETO` — `.dev.vars` e `.env` já estão no
@@ -64,9 +64,13 @@ obtido via `/api/auth/login`.
 | Método | Rota | Autenticação | Descrição |
 |---|---|---|---|
 | GET | `/api/saude` | Nenhuma | Health check. |
-| POST | `/api/auth/registrar-socio` | Nenhuma (bootstrap único) | Cria o primeiro (e só o primeiro) usuário-sócio. Recusa com 403 se `usuarios` já tiver algum registro. |
-| POST | `/api/auth/login` | Nenhuma | `{ telefone, senha }` → seta cookie de sessão (30 dias). |
+| POST | `/api/auth/registrar-socio` | Nenhuma (bootstrap dos 2 primeiros sócios) | Cria um usuário-sócio enquanto houver menos de 2 em `usuarios`. Recusa com 403 a partir do 3º cadastro — use as rotas de solicitação abaixo. |
+| POST | `/api/auth/login` | Nenhuma | `{ telefone, senha }` → seta cookie de sessão assinado (30 dias). |
 | POST | `/api/auth/logout` | Sessão | Encerra a sessão atual (remove do banco e limpa o cookie). |
+| POST | `/api/auth/solicitacoes-socio` | Sessão | `{ nome, telefone, senha }` do sócio candidato — o sócio logado propõe um novo sócio (3º, 4º, ...); aprovação automática do solicitante. |
+| GET | `/api/auth/solicitacoes-socio` | Sessão | Lista solicitações de novo sócio, com quem já aprovou cada uma. |
+| POST | `/api/auth/solicitacoes-socio/:id/aprovar` | Sessão | Registra a aprovação do sócio logado; cria a conta quando todos os sócios ativos tiverem aprovado. |
+| POST | `/api/auth/solicitacoes-socio/:id/rejeitar` | Sessão | Qualquer sócio ativo pode rejeitar sozinho — encerra a solicitação sem criar conta. |
 | GET | `/api/servicos?ativos=1` | Sessão | Lista serviços; `ativos=1` filtra só os ativos. |
 | POST | `/api/servicos` | Sessão | Cria serviço. |
 | PUT | `/api/servicos/:id` | Sessão | Edita serviço (campos parciais). |
@@ -76,24 +80,36 @@ obtido via `/api/auth/login`.
 | GET | `/api/barbeiros/:id/disponibilidade` | Sessão | Lista a disponibilidade semanal do barbeiro. |
 | PUT | `/api/barbeiros/:id/disponibilidade` | Sessão | `{ disponibilidade: [{ diaSemana, horaInicio, horaFim }] }` — substitui a semana inteira (apaga e recria). |
 
-## Comportamento de bootstrap único (`registrar-socio`)
+## Comportamento de bootstrap (`registrar-socio`) e expansão do quadro de sócios
 
-`POST /api/auth/registrar-socio` só funciona **uma vez por banco**: antes de criar
-qualquer usuário, a rota verifica se `usuarios` já tem algum registro e recusa com `403`
-se tiver. Isso existe para impedir que a rota vire uma porta aberta de criação de conta
-com acesso total, caso o deploy fique no ar antes de alguém lembrar de removê-la — o
-código impede sozinho, não depende de disciplina operacional.
+`POST /api/auth/registrar-socio` funciona **livremente só para os 2 primeiros sócios**:
+antes de criar qualquer usuário, a rota conta quantos já existem em `usuarios` e recusa
+com `403` a partir do 3º cadastro. Isso existe para impedir que a rota vire uma porta
+aberta de criação de conta com acesso total, caso o deploy fique no ar antes de alguém
+lembrar de removê-la/protegê-la — o código impede sozinho, não depende de disciplina
+operacional.
 
 Como `usuarios` é exclusiva de sócios (ver decisão em
 `00-arquitetura-e-convencoes.md`), essa checagem continua válida para sempre: depois do
-bootstrap inicial dos 2 sócios, a tabela nunca mais deveria crescer por essa rota.
+bootstrap inicial dos 2 sócios, a tabela nunca mais cresce por essa rota.
+
+**Para adicionar um 3º sócio (ou mais) depois do bootstrap**, o caminho é outro: um sócio
+logado cria uma solicitação (`POST /api/auth/solicitacoes-socio`) com os dados do
+candidato; o solicitante conta como tendo aprovado automaticamente; cada um dos demais
+sócios ativos precisa aprovar a mesma solicitação, autenticado na própria sessão
+(`POST /api/auth/solicitacoes-socio/:id/aprovar`). A conta só é criada quando **todos**
+os sócios ativos no momento tiverem aprovado — qualquer um pode rejeitar sozinho
+(`POST /api/auth/solicitacoes-socio/:id/rejeitar`), encerrando a solicitação sem criar
+conta. Isso evita que um sócio sozinho consiga adicionar um novo administrador com acesso
+total ao sistema sem o conhecimento/consentimento do(s) outro(s).
 
 **Se precisar recriar os sócios do zero em um ambiente já usado** (ex.: ambiente de
 desenvolvimento): apague as linhas correspondentes em `usuarios` (o `ON DELETE` das FKs
-de `barbeiros`/`sessoes` não está em cascata — apague primeiro os registros dependentes
-em `barbeiros` e `sessoes`) ou resete o banco de desenvolvimento inteiro. **Nunca**
-"reabrir" a rota em produção editando o código — isso reabriria a porta que a checagem
-existe para fechar.
+de `barbeiros`/`sessoes`/`solicitacoes_socio`/`aprovacoes_socio` não está em cascata —
+apague primeiro os registros dependentes) ou resete o banco de desenvolvimento inteiro.
+**Nunca** "reabrir" a rota `registrar-socio` em produção editando o código — isso
+reabriria a porta que a checagem existe para fechar; use o fluxo de solicitação/aprovação
+acima em vez disso.
 
 ## Checklist antes de ir para produção
 
@@ -105,7 +121,7 @@ existe para fechar.
 4. Aplicar a migração no banco real: `DATABASE_URL=<url-de-producao> npm run db:migrate`.
 5. Cadastrar os 2 sócios via `POST /api/auth/registrar-socio` **imediatamente após o
    deploy, antes de qualquer outra pessoa conseguir acessar a URL pública** — a rota se
-   fecha sozinha depois do primeiro registro, mas até lá qualquer um que descobrir a URL
+   fecha sozinha depois do 2º registro, mas até lá qualquer um que descobrir a URL
    poderia se cadastrar como sócio.
 6. Usar **roteamento por caminho único sob o mesmo domínio**
    (`dominio.com.br/api/*` → Worker, resto → Pages) em vez de subdomínios separados para
@@ -147,10 +163,33 @@ curl -i -b cookies.txt -X POST http://localhost:8787/api/auth/logout
 # 6. Confirmar que uma rota protegida agora recusa (sem cookie válido)
 curl -i http://localhost:8787/api/servicos
 
-# 7. Confirmar que um segundo registrar-socio é recusado (403)
+# 7. Registrar o segundo sócio (bootstrap ainda aberto, 2º de 2)
 curl -i -X POST http://localhost:8787/api/auth/registrar-socio \
   -H "Content-Type: application/json" \
   -d '{"nome":"Sócio Dois","telefone":"11999990002","senha":"outra-senha-123"}'
+
+# 8. Confirmar que um terceiro registrar-socio é recusado (403) — quadro de bootstrap fechado
+curl -i -X POST http://localhost:8787/api/auth/registrar-socio \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Sócio Três","telefone":"11999990003","senha":"outra-senha-123"}'
+
+# 9. Fluxo de expansão do quadro: sócio 1 loga e propõe um 3º sócio
+curl -i -c cookies1.txt -X POST http://localhost:8787/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"telefone":"11999990001","senha":"senha-forte-123"}'
+
+curl -s -b cookies1.txt -X POST http://localhost:8787/api/auth/solicitacoes-socio \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Sócio Três","telefone":"11999990003","senha":"outra-senha-123"}'
+# ^ resposta traz "usuarioCriado": null — falta a aprovação do sócio 2
+
+# 10. Sócio 2 loga e aprova a mesma solicitação (id 1, ajuste conforme a resposta acima)
+curl -i -c cookies2.txt -X POST http://localhost:8787/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"telefone":"11999990002","senha":"outra-senha-123"}'
+
+curl -s -b cookies2.txt -X POST http://localhost:8787/api/auth/solicitacoes-socio/1/aprovar
+# ^ agora "usuarioCriado" vem preenchido — a conta do 3º sócio foi criada
 ```
 
 ## Documentos do projeto

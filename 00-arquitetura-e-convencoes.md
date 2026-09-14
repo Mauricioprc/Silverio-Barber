@@ -172,7 +172,17 @@ Fase 3 não perder o contexto:
    aplicação continua valendo como reforço, só para dar mensagem de erro amigável ao
    usuário antes de bater no banco — nunca substitui a constraint.
    Fontes: [The btree_gist extension — Neon Docs](https://neon.com/docs/extensions/btree_gist), [PostgreSQL's GiST Exclusion Constraint — Amit Avraham](https://amitavroy.com/articles/postgresql-gist-exclusion-constraintthe-database-evel-answer-to-double-bookings).
-9. Consentimento explícito (opt-in) para mensagens automáticas via WhatsApp, obrigatório
+9. **Expansão do quadro de sócios exige aprovação coletiva, a partir da Fase 1**: os 2
+   sócios iniciais são criados livremente via bootstrap (`registrar-socio`, que se fecha
+   sozinho ao atingir 2 registros em `usuarios`). Depois disso, adicionar um novo sócio
+   (3º, 4º...) não pode depender da vontade de um único sócio logado — precisa de
+   aprovação de **todos** os sócios ativos no momento, cada um autenticado na própria
+   sessão, antes da conta ser criada. Motivo: sócio tem acesso administrativo total ao
+   sistema (dado financeiro, dado de cliente nas fases seguintes); permitir que um único
+   sócio crie outro administrador sozinho é uma porta de escalonamento de privilégio sem
+   controle. Ver `01a-fase1-correcoes.md` para o desenho de referência (tabelas
+   `solicitacoes_socio`/`aprovacoes_socio`, rotas `/api/auth/solicitacoes-socio/*`).
+10. Consentimento explícito (opt-in) para mensagens automáticas via WhatsApp, obrigatório
    desde a Fase 4: o cadastro/fluxo de agendamento online do cliente deve incluir uma
    confirmação explícita (checkbox não pré-marcado) de que ele aceita receber mensagem de
    confirmação/lembrete automático. Não inferir consentimento implicitamente só por o

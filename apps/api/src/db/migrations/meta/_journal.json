@@ -8,6 +8,13 @@
       "when": 1789395840191,
       "tag": "0000_daffy_tomorrow_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789404191448,
+      "tag": "0001_rich_ironclad",
+      "breakpoints": true
     }
   ]
 }

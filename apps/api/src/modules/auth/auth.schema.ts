@@ -14,5 +14,9 @@ export const loginSchema = z.object({
   senha: z.string().min(1, "Senha é obrigatória."),
 });
 
+/** Mesmo formato de `registrarSocioSchema` — dados do sócio candidato a ser aprovado. */
+export const criarSolicitacaoSocioSchema = registrarSocioSchema;
+
 export type RegistrarSocioInput = z.infer<typeof registrarSocioSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type CriarSolicitacaoSocioInput = z.infer<typeof criarSolicitacaoSocioSchema>;

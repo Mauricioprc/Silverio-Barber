@@ -1,4 +1,8 @@
-import "dotenv/config";
+import { config } from "dotenv";
+// Mesmo motivo de `src/db/migrar.ts`: `.dev.vars` é o arquivo usado em desenvolvimento
+// local (ver README.md), e o `dotenv` só lê `.env` por padrão.
+config({ path: ".dev.vars" });
+config();
 import { defineConfig } from "drizzle-kit";
 
 if (!process.env.DATABASE_URL) {

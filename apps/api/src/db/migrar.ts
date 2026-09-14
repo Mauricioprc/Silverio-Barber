@@ -1,4 +1,9 @@
-import "dotenv/config";
+import { config } from "dotenv";
+// `.dev.vars` é o arquivo que o Wrangler usa em desenvolvimento local (ver README.md) —
+// carregamos ele explicitamente aqui porque o comportamento padrão de `dotenv` é ler só
+// `.env`, e este script roda fora do runtime do Worker.
+config({ path: ".dev.vars" });
+config(); // fallback: também aceita `.env`, se existir, sem sobrescrever o que já foi lido
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";

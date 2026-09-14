@@ -7,6 +7,7 @@ import {
   text,
   time,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -80,3 +81,41 @@ export const sessoes = pgTable("sessoes", {
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
 });
+
+/**
+ * A partir do 3º sócio, `registrar-socio` não funciona mais direto (ver
+ * `auth.service.ts`): um sócio logado propõe um novo sócio aqui, e a conta só é
+ * criada em `usuarios`/`barbeiros` quando todos os sócios ativos tiverem aprovado
+ * (registrado em `aprovacoes_socio`). `senhaHash` é gerada no momento da solicitação —
+ * nunca senha em texto puro, mesmo pendente de aprovação (regra 1 do documento de
+ * convenções também vale aqui).
+ */
+export const solicitacoesSocio = pgTable("solicitacoes_socio", {
+  id: serial("id").primaryKey(),
+  nome: text("nome").notNull(),
+  telefone: text("telefone").notNull(),
+  senhaHash: text("senha_hash").notNull(),
+  solicitadoPor: integer("solicitado_por")
+    .notNull()
+    .references(() => usuarios.id),
+  // 'pendente' | 'aprovada' | 'rejeitada'
+  status: text("status").notNull().default("pendente"),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  resolvidaEm: timestamp("resolvida_em", { withTimezone: true }),
+});
+
+/** Um voto de aprovação de um sócio ativo para uma `solicitacao_socio`. */
+export const aprovacoesSocio = pgTable(
+  "aprovacoes_socio",
+  {
+    id: serial("id").primaryKey(),
+    solicitacaoId: integer("solicitacao_id")
+      .notNull()
+      .references(() => solicitacoesSocio.id),
+    usuarioId: integer("usuario_id")
+      .notNull()
+      .references(() => usuarios.id),
+    aprovadoEm: timestamp("aprovado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (tabela) => [unique().on(tabela.solicitacaoId, tabela.usuarioId)]
+);
