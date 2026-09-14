@@ -1,0 +1,11 @@
+# Copie este arquivo para `.dev.vars` (nunca versionado) e preencha com valores reais
+# de desenvolvimento. O Wrangler carrega `.dev.vars` automaticamente em `wrangler dev`.
+# O `drizzle-kit` (db:generate) também lê DATABASE_URL a partir daqui via dotenv.
+
+# String de conexão do Neon (projeto de desenvolvimento). Formato:
+# postgresql://usuario:senha@ep-exemplo.regiao.aws.neon.tech/nomedobanco?sslmode=require
+DATABASE_URL=
+
+# Segredo usado para assinar/derivar tokens de sessão. Gere um valor aleatório forte,
+# por exemplo: `openssl rand -base64 48`
+SESSAO_SECRETO=

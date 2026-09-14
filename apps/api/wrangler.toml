@@ -1,0 +1,10 @@
+name = "silverio-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-05"
+compatibility_flags = ["nodejs_compat"]
+
+# Variáveis não-sensíveis podem ficar aqui. As sensíveis (DATABASE_URL, SESSAO_SECRETO)
+# NUNCA devem ser colocadas neste arquivo — configure via `wrangler secret put` em
+# produção e via `.dev.vars` (não versionado) em desenvolvimento local. Ver README.md.
+[vars]
+AMBIENTE = "desenvolvimento"
