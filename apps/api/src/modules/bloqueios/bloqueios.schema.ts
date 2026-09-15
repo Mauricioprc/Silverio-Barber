@@ -1,11 +1,5 @@
 import { z } from "zod";
-
-const horarioLocalSchema = z
-  .string()
-  .regex(
-    /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/,
-    'Horário inválido — use o formato "YYYY-MM-DD HH:MM" (sem fuso).'
-  );
+import { horarioLocalSchema } from "@silverio/shared";
 
 /** Completa segundos (":00") quando ausentes, só para comparar/normalizar strings de horário. */
 function comSegundos(horario: string): string {

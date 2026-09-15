@@ -13,7 +13,7 @@ import { RotaProtegidaSocio } from "./modulos/auth-socio/RotaProtegidaSocio";
 const PaginaPublicaInicial = lazy(() => import("./rotas/publico/PaginaPublicaInicial"));
 const AgendamentoPublicoPage = lazy(() => import("./modulos/agendamento-publico/AgendamentoPublicoPage"));
 const LoginSocioPage = lazy(() => import("./modulos/auth-socio/LoginSocioPage"));
-const PainelInicial = lazy(() => import("./rotas/painel/PainelInicial"));
+const AgendaPage = lazy(() => import("./modulos/agenda/AgendaPage"));
 
 function CarregandoRota() {
   return (
@@ -36,7 +36,7 @@ export default function App() {
                   <Route path="/agendar" element={<AgendamentoPublicoPage />} />
                   <Route path="/login" element={<LoginSocioPage />} />
                   <Route element={<RotaProtegidaSocio />}>
-                    <Route path="/painel" element={<PainelInicial />} />
+                    <Route path="/painel" element={<AgendaPage />} />
                   </Route>
                 </Routes>
               </Suspense>
