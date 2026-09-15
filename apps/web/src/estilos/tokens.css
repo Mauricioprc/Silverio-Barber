@@ -5,3 +5,16 @@
 body {
   @apply bg-base-900 text-base-50 font-sans antialiased;
 }
+
+/* Revisão de acessibilidade (Fase 5): respeita a preferência do sistema por menos
+   movimento — desativa a pulsação do Skeleton e as transições de cor/borda em vez de
+   assumir que toda animação é bem-vinda. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
