@@ -7,7 +7,7 @@ import { exigirLoginCliente } from "../../shared/middleware/exigir-login-cliente
 import { LIMITE_CADASTRO_PUBLICO, LIMITE_LOGIN, LimiteTentativasError, verificarLimiteTentativas } from "../../shared/rate-limit/rate-limite.util";
 import { NOME_COOKIE_SESSAO_CLIENTE, criarSessaoCliente, destruirSessaoCliente } from "../../shared/sessao/sessao-cliente.util";
 import { cadastroPublicoSchema, loginPublicoSchema } from "./clientes-publico.schema";
-import { CredenciaisInvalidasError, autenticarClientePublico, cadastrarClientePublico } from "./clientes-publico.service";
+import { CredenciaisInvalidasError, autenticarClientePublico, cadastrarClientePublico, obterClientePorId } from "./clientes-publico.service";
 
 /**
  * Rotas de auth do **cliente** (`/api/publico/clientes/*`), separadas de
@@ -16,6 +16,14 @@ import { CredenciaisInvalidasError, autenticarClientePublico, cadastrarClientePu
  * públicas de propósito, é o próprio cliente entrando sozinho (ver escopo da Fase 4).
  */
 export const clientesPublicoRoutes = new Hono<AppContexto>();
+
+clientesPublicoRoutes.get("/eu", exigirLoginCliente, async (c) => {
+  const cliente = await obterClientePorId(c.get("db"), c.get("clienteId")!);
+  if (!cliente) {
+    return c.json({ erro: "Sessão inválida ou expirada." }, 401);
+  }
+  return c.json({ cliente });
+});
 
 async function iniciarSessaoCliente(c: Context<AppContexto>, clienteId: number) {
   const { token, expiraEm } = await criarSessaoCliente(c.get("db"), clienteId);

@@ -58,6 +58,17 @@ export async function cadastrarClientePublico(db: Db, dados: CadastroPublicoInpu
   return { id: cliente.id, vinculado: false };
 }
 
+/** Busca o cliente logado pelo id da sessão (rota "quem sou eu" do front). */
+export async function obterClientePorId(db: Db, id: number) {
+  const [cliente] = await db
+    .select({ id: clientes.id, nome: clientes.nome, telefone: clientes.telefone, telefoneVerificado: clientes.telefoneVerificado })
+    .from(clientes)
+    .where(eq(clientes.id, id))
+    .limit(1);
+
+  return cliente ?? null;
+}
+
 export async function autenticarClientePublico(db: Db, dados: LoginPublicoInput) {
   const [cliente] = await db
     .select({ id: clientes.id, nome: clientes.nome, telefone: clientes.telefone, senhaHash: clientes.senhaHash, telefoneVerificado: clientes.telefoneVerificado })

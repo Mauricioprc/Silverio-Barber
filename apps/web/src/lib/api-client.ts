@@ -1,13 +1,19 @@
-/** Erro padronizado de API — camada de UI decide a mensagem humana a partir de `status`/`codigo`. */
+/**
+ * Erro padronizado de API — camada de UI decide a mensagem humana a partir de
+ * `status`/`codigo`. `corpo` carrega o resto do JSON de erro (ex.: `retryAfterSegundos`,
+ * `precisaVerificar`) para os casos em que uma tela precisa de mais que a mensagem.
+ */
 export class ApiError extends Error {
   status: number;
   codigo: string;
+  corpo: Record<string, unknown> | null;
 
-  constructor(status: number, codigo: string, mensagem: string) {
+  constructor(status: number, codigo: string, mensagem: string, corpo: Record<string, unknown> | null = null) {
     super(mensagem);
     this.name = "ApiError";
     this.status = status;
     this.codigo = codigo;
+    this.corpo = corpo;
   }
 }
 
@@ -43,8 +49,9 @@ export async function apiFetch<T>(caminho: string, opcoes: Opcoes = {}): Promise
   const dados = await resposta.json().catch(() => null);
 
   if (!resposta.ok) {
-    const mensagem = (dados && typeof dados === "object" && "erro" in dados ? String(dados.erro) : null) ?? "Algo deu errado do nosso lado. Tente novamente em instantes.";
-    throw new ApiError(resposta.status, String(resposta.status), mensagem);
+    const corpo = dados && typeof dados === "object" ? (dados as Record<string, unknown>) : null;
+    const mensagem = (corpo && "erro" in corpo ? String(corpo.erro) : null) ?? "Algo deu errado do nosso lado. Tente novamente em instantes.";
+    throw new ApiError(resposta.status, String(resposta.status), mensagem, corpo);
   }
 
   return dados as T;

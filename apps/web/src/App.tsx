@@ -11,6 +11,7 @@ import { RotaProtegidaSocio } from "./modulos/auth-socio/RotaProtegidaSocio";
 // Code-splitting por área: quem só acessa a página pública de agendamento nunca baixa o
 // bundle do painel interno (ver documento de convenções).
 const PaginaPublicaInicial = lazy(() => import("./rotas/publico/PaginaPublicaInicial"));
+const AgendamentoPublicoPage = lazy(() => import("./modulos/agendamento-publico/AgendamentoPublicoPage"));
 const LoginSocioPage = lazy(() => import("./modulos/auth-socio/LoginSocioPage"));
 const PainelInicial = lazy(() => import("./rotas/painel/PainelInicial"));
 
@@ -32,6 +33,7 @@ export default function App() {
               <Suspense fallback={<CarregandoRota />}>
                 <Routes>
                   <Route path="/" element={<PaginaPublicaInicial />} />
+                  <Route path="/agendar" element={<AgendamentoPublicoPage />} />
                   <Route path="/login" element={<LoginSocioPage />} />
                   <Route element={<RotaProtegidaSocio />}>
                     <Route path="/painel" element={<PainelInicial />} />
