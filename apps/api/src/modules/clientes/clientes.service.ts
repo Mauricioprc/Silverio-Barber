@@ -1,6 +1,6 @@
-import { count, eq, ilike, or } from "drizzle-orm";
+import { count, desc, eq, ilike, or } from "drizzle-orm";
 import type { Db } from "../../db/client";
-import { clientes } from "../../db/schema";
+import { agendamentos, clientes } from "../../db/schema";
 import type { PaginacaoInput } from "../../shared/http/paginacao.schema";
 import { gerarHashSenha } from "../../shared/senha/senha.util";
 import type { CriarClienteInput, EditarClienteInput } from "./clientes.schema";
@@ -33,12 +33,25 @@ function ehViolacaoDeTelefoneUnico(erro: unknown): boolean {
  * Paginado (correção pós-auditoria — ver `shared/http/paginacao.schema.ts`): devolve só
  * a página pedida (`limite`/`offset`) mais `total` (contagem sem paginação, pra o
  * chamador montar "página X de Y"), em vez da tabela inteira de uma vez.
+ *
+ * Projeção explícita de colunas (correção — Fase 4 do front): `db.select()` sem
+ * projeção devolvia `senhaHash`/`senhaHashPendente` pro chamador — essa listagem é a
+ * única rota do sistema que expunha isso, as demais (`criarCliente`/`editarCliente`) já
+ * projetavam campos seguros. Descoberto ao construir a tela de busca de clientes do
+ * painel, que teria vazado hash de senha pro browser do sócio a cada busca.
  */
 export async function listarClientes(db: Db, paginacao: PaginacaoInput, busca?: string) {
   const condicao = busca ? or(ilike(clientes.nome, `%${busca}%`), ilike(clientes.telefone, `%${busca}%`)) : undefined;
+  const colunas = {
+    id: clientes.id,
+    nome: clientes.nome,
+    telefone: clientes.telefone,
+    telefoneVerificado: clientes.telefoneVerificado,
+    criadoEm: clientes.criadoEm,
+  };
 
   const [itens, contagem] = await Promise.all([
-    db.select().from(clientes).where(condicao).limit(paginacao.limite).offset(paginacao.offset),
+    db.select(colunas).from(clientes).where(condicao).limit(paginacao.limite).offset(paginacao.offset),
     db.select({ total: count() }).from(clientes).where(condicao),
   ]);
 
@@ -59,6 +72,27 @@ export async function criarCliente(db: Db, dados: CriarClienteInput) {
     }
     throw erro;
   }
+}
+
+/**
+ * Histórico básico do cliente (Fase 4 do front) — não existia nenhuma forma de listar
+ * agendamentos por `clienteId` até aqui (`listarAgendamentosQuerySchema` exige
+ * `barbeiro_id`+`data`, pensado pra visão diária do balcão, não pra histórico de um
+ * cliente). Paginado desde o início, mesmo padrão de `listarClientes`.
+ */
+export async function listarAgendamentosDoCliente(db: Db, clienteId: number, limite: number, offset: number) {
+  const [itens, contagem] = await Promise.all([
+    db
+      .select()
+      .from(agendamentos)
+      .where(eq(agendamentos.clienteId, clienteId))
+      .orderBy(desc(agendamentos.inicio))
+      .limit(limite)
+      .offset(offset),
+    db.select({ total: count() }).from(agendamentos).where(eq(agendamentos.clienteId, clienteId)),
+  ]);
+
+  return { itens, total: contagem[0]?.total ?? 0 };
 }
 
 export async function editarCliente(db: Db, id: number, dados: EditarClienteInput) {

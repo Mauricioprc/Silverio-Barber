@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "../../../componentes/Card";
 import { Badge } from "../../../componentes/Badge";
-import { useLinkWhatsapp } from "../hooks/useMutacoesAgendamento";
+import { useLinkWhatsapp, useEditarAgendamento } from "../hooks/useMutacoesAgendamento";
 import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useToast } from "../../../componentes/Toast";
 import type { AgendamentoDoDia, ServicoInterno } from "../tipos";
@@ -26,6 +26,7 @@ type Props = {
 export function ItemAgendamento({ agendamento, servicos, onReagendar, onCancelar }: Props) {
   const servico = servicos.find((s) => s.id === agendamento.servicoId);
   const linkWhatsapp = useLinkWhatsapp();
+  const concluir = useEditarAgendamento();
   const { mostrarToast } = useToast();
   const [abrindo, setAbrindo] = useState(false);
 
@@ -36,6 +37,19 @@ export function ItemAgendamento({ agendamento, servicos, onReagendar, onCancelar
       onError: (erro) => mostrarToast(mensagemHumana(erro), "erro"),
       onSettled: () => setAbrindo(false),
     });
+  }
+
+  function aoConcluir() {
+    // Não existe "registrar pagamento" separado no back-end: marcar como `concluido`
+    // é o que dispara o lançamento financeiro automático (valor copiado do serviço,
+    // ver `financeiro.service.ts`) — não há campo de forma de pagamento na API.
+    concluir.mutate(
+      { id: agendamento.id, status: "concluido" },
+      {
+        onSuccess: () => mostrarToast("Agendamento concluído — lançamento financeiro criado."),
+        onError: (erro) => mostrarToast(mensagemHumana(erro), "erro"),
+      }
+    );
   }
 
   const podeAgir = agendamento.status === "confirmado";
@@ -59,6 +73,9 @@ export function ItemAgendamento({ agendamento, servicos, onReagendar, onCancelar
           </button>
           <button onClick={() => onReagendar(agendamento)} className="text-base-300 underline">
             Reagendar
+          </button>
+          <button onClick={aoConcluir} disabled={concluir.isPending} className="text-destaque-400 underline">
+            Concluir
           </button>
           <button onClick={() => onCancelar(agendamento)} className="text-red-400 underline">
             Cancelar

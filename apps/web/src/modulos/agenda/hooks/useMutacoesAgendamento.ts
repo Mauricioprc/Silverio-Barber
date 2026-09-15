@@ -34,7 +34,14 @@ export function useEditarAgendamento() {
       apiFetch<{ agendamento: AgendamentoDoDia }>(`/agendamentos/${id}`, { method: "PUT", corpo: dados }).then(
         (r) => r.agendamento
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["painel", "agendamentos"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["painel", "agendamentos"] });
+      // Marcar/desmarcar `concluido` cria ou remove um lançamento financeiro
+      // automaticamente (ver `financeiro.service.ts`) — sem isso, o dashboard
+      // financeiro ficava com números desatualizados por até `staleTime` (30s) depois
+      // de concluir um agendamento (achado na verificação da Fase 4).
+      queryClient.invalidateQueries({ queryKey: ["painel", "financeiro"] });
+    },
   });
 }
 

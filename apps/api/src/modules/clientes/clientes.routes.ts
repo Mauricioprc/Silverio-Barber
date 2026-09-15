@@ -2,8 +2,16 @@ import { Hono } from "hono";
 import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
+import { paginacaoQuerySchema } from "../../shared/http/paginacao.schema";
 import { criarClienteSchema, editarClienteSchema, listarClientesQuerySchema } from "./clientes.schema";
-import { ClienteNaoEncontradoError, TelefoneJaCadastradoError, criarCliente, editarCliente, listarClientes } from "./clientes.service";
+import {
+  ClienteNaoEncontradoError,
+  TelefoneJaCadastradoError,
+  criarCliente,
+  editarCliente,
+  listarAgendamentosDoCliente,
+  listarClientes,
+} from "./clientes.service";
 
 export const clientesRoutes = new Hono<AppContexto>();
 
@@ -38,6 +46,22 @@ clientesRoutes.post("/", async (c) => {
     }
     throw erro;
   }
+});
+
+clientesRoutes.get("/:id/agendamentos", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ erro: "Id inválido." }, 400);
+
+  const paginacao = paginacaoQuerySchema.safeParse({
+    limite: c.req.query("limite"),
+    offset: c.req.query("offset"),
+  });
+  if (!paginacao.success) {
+    return c.json({ erro: "Parâmetros inválidos.", detalhes: paginacao.error.flatten() }, 400);
+  }
+
+  const { itens, total } = await listarAgendamentosDoCliente(c.get("db"), id, paginacao.data.limite, paginacao.data.offset);
+  return c.json({ agendamentos: itens, total, limite: paginacao.data.limite, offset: paginacao.data.offset });
 });
 
 clientesRoutes.put("/:id", async (c) => {

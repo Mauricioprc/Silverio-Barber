@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useAuthSocio } from "../../contextos/auth-socio-context";
 import { useBarbeirosInternos } from "./hooks/useBarbeirosInternos";
 import { useServicosInternos } from "./hooks/useServicosInternos";
 import { useAgendamentosDoDia } from "./hooks/useAgendamentosDoDia";
@@ -16,7 +15,6 @@ import { EstadoVazio } from "../../componentes/EstadoVazio";
 import type { AgendamentoDoDia } from "./tipos";
 
 export default function AgendaPage() {
-  const { socio, logout } = useAuthSocio();
   const { data: barbeiros, isLoading: carregandoBarbeiros } = useBarbeirosInternos();
   const { data: servicos } = useServicosInternos();
 
@@ -36,21 +34,15 @@ export default function AgendaPage() {
   const { data: agendamentos, isLoading: carregandoAgendamentos, isError } = useAgendamentosDoDia(barbeiroId, data);
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-4 p-4">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Agenda</h1>
-          <p className="text-xs text-base-300">{socio?.nome}</p>
-        </div>
+        <h1 className="text-xl font-semibold">Agenda</h1>
         <div className="flex gap-2">
           <Botao variante="secundaria" onClick={() => setBloqueiosAberto(true)}>
             Bloqueios
           </Botao>
           <Botao onClick={() => setNovoAgendamentoAberto(true)} disabled={!barbeiroId}>
             Novo agendamento
-          </Botao>
-          <Botao variante="secundaria" onClick={() => logout()}>
-            Sair
           </Botao>
         </div>
       </div>
