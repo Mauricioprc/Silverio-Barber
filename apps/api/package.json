@@ -13,6 +13,7 @@
     "test:integracao": "node scripts/teste-integracao.mjs"
   },
   "dependencies": {
+    "@silverio/shared": "*",
     "@neondatabase/serverless": "^0.10.4",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.6.14",

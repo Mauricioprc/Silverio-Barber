@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { horarioLocalSchema } from "../agendamentos/agendamentos.schema";
+import { horarioLocalSchema, dataLocalSchema } from "@silverio/shared";
 
 export const disponibilidadeQuerySchema = z.object({
   barbeiro_id: z.coerce.number().int().positive(),
-  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida — use o formato "YYYY-MM-DD".'),
+  data: dataLocalSchema,
 });
 
 /**

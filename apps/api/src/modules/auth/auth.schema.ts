@@ -1,11 +1,9 @@
 import { z } from "zod";
+import { telefoneSchema } from "@silverio/shared";
 
 export const registrarSocioSchema = z.object({
   nome: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120),
-  telefone: z
-    .string()
-    .trim()
-    .regex(/^\+?[0-9]{10,15}$/, "Telefone inválido — use apenas dígitos (com DDD, opcionalmente com +55)."),
+  telefone: telefoneSchema,
   senha: z.string().min(8, "Senha precisa ter pelo menos 8 caracteres.").max(200),
 });
 

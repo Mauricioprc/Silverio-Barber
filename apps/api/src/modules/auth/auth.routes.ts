@@ -7,9 +7,23 @@ import { exigirLogin } from "../../shared/middleware/exigir-login";
 import { LIMITE_LOGIN, LimiteTentativasError, verificarLimiteTentativas } from "../../shared/rate-limit/rate-limite.util";
 import { NOME_COOKIE_SESSAO, criarSessao, destruirSessao } from "../../shared/sessao/sessao.util";
 import { loginSchema, registrarSocioSchema } from "./auth.schema";
-import { BootstrapEncerradoError, CredenciaisInvalidasError, autenticar, registrarSocio } from "./auth.service";
+import {
+  BootstrapEncerradoError,
+  CredenciaisInvalidasError,
+  autenticar,
+  obterUsuarioPorId,
+  registrarSocio,
+} from "./auth.service";
 
 export const authRoutes = new Hono<AppContexto>();
+
+authRoutes.get("/eu", exigirLogin, async (c) => {
+  const usuario = await obterUsuarioPorId(c.get("db"), c.get("usuarioId")!);
+  if (!usuario) {
+    return c.json({ erro: "Sessão inválida ou expirada." }, 401);
+  }
+  return c.json({ usuario });
+});
 
 authRoutes.post("/registrar-socio", async (c) => {
   const validacao = await validarCorpo(c, registrarSocioSchema);

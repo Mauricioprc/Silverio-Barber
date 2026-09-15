@@ -64,6 +64,17 @@ export async function registrarSocio(db: Db, dados: RegistrarSocioInput) {
   return { usuario, barbeiro };
 }
 
+/** Busca o sócio logado pelo id da sessão (rota "quem sou eu" do front). */
+export async function obterUsuarioPorId(db: Db, id: number) {
+  const [usuario] = await db
+    .select({ id: usuarios.id, nome: usuarios.nome, telefone: usuarios.telefone })
+    .from(usuarios)
+    .where(eq(usuarios.id, id))
+    .limit(1);
+
+  return usuario ?? null;
+}
+
 /** Autentica por telefone+senha. Lança `CredenciaisInvalidasError` sem distinguir a causa. */
 export async function autenticar(db: Db, dados: LoginInput) {
   const [usuario] = await db

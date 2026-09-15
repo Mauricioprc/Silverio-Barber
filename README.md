@@ -51,6 +51,23 @@ cookie com `Secure`, use um navegador que aceite cookies `Secure` em `localhost`
 (Chrome/Edge fazem isso) — em `curl`, use `--cookie-jar`/`--cookie` normalmente, o
 atributo `Secure` não impede o `curl` de enviar/receber.
 
+### Front-end (`apps/web`)
+
+Com a API já rodando (`npm run dev:api`, porta 8787), em outro terminal:
+
+```bash
+npm run dev:web
+```
+
+O front sobe em `http://localhost:5173` (Vite). O `vite.config.ts` faz proxy de `/api/*`
+para `http://localhost:8787`, então front e API aparecem como mesma origem para o
+navegador — necessário para o cookie de sessão (`SameSite=Strict`) funcionar sem CORS,
+igual à configuração de produção (ver `desenvolvimentoFront-end/00-arquitetura-e-convencoes-frontend.md`).
+
+Não há tela de negócio ainda (Fase 1 é só fundação): `/` é um placeholder público, `/login`
+autentica um sócio já cadastrado (via `/api/auth/registrar-socio` ou pelo bootstrap
+existente) e redireciona para `/painel`, que exige sessão.
+
 ## Variáveis de ambiente
 
 | Variável | Onde configurar | Descrição |

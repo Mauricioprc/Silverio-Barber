@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { paginacaoQuerySchema } from "../../shared/http/paginacao.schema";
-
-const telefoneSchema = z
-  .string()
-  .trim()
-  .regex(/^\+?[0-9]{10,15}$/, "Telefone inválido — use apenas dígitos (com DDD, opcionalmente com +55).");
+import { telefoneSchema } from "@silverio/shared";
 
 export const criarClienteSchema = z.object({
   nome: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120),
