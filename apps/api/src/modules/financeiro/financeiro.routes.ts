@@ -13,6 +13,8 @@ function validarFiltro(c: Context<AppContexto>) {
     de: c.req.query("de"),
     ate: c.req.query("ate"),
     barbeiro_id: c.req.query("barbeiro_id"),
+    limite: c.req.query("limite"),
+    offset: c.req.query("offset"),
   });
 }
 
@@ -32,6 +34,6 @@ financeiroRoutes.get("/lancamentos", async (c) => {
     return c.json({ erro: "Parâmetros inválidos.", detalhes: filtro.error.flatten() }, 400);
   }
 
-  const lancamentos = await listarLancamentos(c.get("db"), filtro.data);
-  return c.json({ lancamentos });
+  const { itens, total } = await listarLancamentos(c.get("db"), filtro.data);
+  return c.json({ lancamentos: itens, total, limite: filtro.data.limite, offset: filtro.data.offset });
 });

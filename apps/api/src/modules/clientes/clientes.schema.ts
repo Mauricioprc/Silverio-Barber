@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { paginacaoQuerySchema } from "../../shared/http/paginacao.schema";
 
 const telefoneSchema = z
   .string()
@@ -21,9 +22,11 @@ export const editarClienteSchema = z
     message: "Informe ao menos um campo: nome, telefone ou senha.",
   });
 
-export const listarClientesQuerySchema = z.object({
-  busca: z.string().trim().min(1).optional(),
-});
+export const listarClientesQuerySchema = z
+  .object({
+    busca: z.string().trim().min(1).optional(),
+  })
+  .merge(paginacaoQuerySchema);
 
 export type CriarClienteInput = z.infer<typeof criarClienteSchema>;
 export type EditarClienteInput = z.infer<typeof editarClienteSchema>;

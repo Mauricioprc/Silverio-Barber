@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
+import { obterIp } from "../../shared/http/ip.util";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
+import { LIMITE_LOGIN, LimiteTentativasError, verificarLimiteTentativas } from "../../shared/rate-limit/rate-limite.util";
 import { NOME_COOKIE_SESSAO, criarSessao, destruirSessao } from "../../shared/sessao/sessao.util";
 import { loginSchema, registrarSocioSchema } from "./auth.schema";
 import { BootstrapEncerradoError, CredenciaisInvalidasError, autenticar, registrarSocio } from "./auth.service";
@@ -34,6 +36,12 @@ authRoutes.post("/login", async (c) => {
   if (validacao.dados === null) return validacao.resposta;
 
   try {
+    // Correção pós-auditoria: limite de tentativas por telefone+IP antes de checar a
+    // senha — sem isso, o login de sócio (acesso administrativo total) não tinha
+    // nenhuma defesa contra força bruta. Conta a tentativa mesmo que a senha esteja
+    // certa (ver `rate-limite.util.ts`).
+    await verificarLimiteTentativas(c.get("db"), "login_socio", validacao.dados.telefone, obterIp(c), LIMITE_LOGIN);
+
     const usuario = await autenticar(c.get("db"), validacao.dados);
     const { token, expiraEm } = await criarSessao(c.get("db"), usuario.id);
 
@@ -50,6 +58,10 @@ authRoutes.post("/login", async (c) => {
 
     return c.json({ usuario });
   } catch (erro) {
+    if (erro instanceof LimiteTentativasError) {
+      c.header("Retry-After", String(erro.retryAfterSegundos));
+      return c.json({ erro: erro.message }, 429);
+    }
     if (erro instanceof CredenciaisInvalidasError) {
       return c.json({ erro: erro.message }, 401);
     }

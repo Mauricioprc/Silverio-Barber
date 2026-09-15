@@ -1,6 +1,7 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
+import { obterIp } from "../../shared/http/ip.util";
 import { exigirLoginCliente } from "../../shared/middleware/exigir-login-cliente";
 import { criarEnviadorWhatsapp } from "../../shared/whatsapp/enviador-whatsapp";
 import { confirmarVerificacaoSchema } from "./verificacao.schema";
@@ -11,12 +12,6 @@ export const verificacaoRoutes = new Hono<AppContexto>();
 // Ambas as rotas exigem o cliente já logado (ver verificacao.service.ts — o telefone-alvo
 // é sempre o da sessão, nunca vem do corpo da requisição).
 verificacaoRoutes.use("*", exigirLoginCliente);
-
-function obterIp(c: Context<AppContexto>): string {
-  // Cloudflare popula CF-Connecting-IP com o IP real do cliente (mais confiável que
-  // X-Forwarded-For, que pode ser forjado por proxies intermediários não confiáveis).
-  return c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "desconhecido";
-}
 
 verificacaoRoutes.post("/enviar", async (c) => {
   const clienteId = c.get("clienteId");

@@ -38,7 +38,9 @@ agendamentosRoutes.post("/", async (c) => {
   if (validacao.dados === null) return validacao.resposta;
 
   try {
-    const agendamento = await criarAgendamento(c.get("db"), validacao.dados);
+    // `aceitaMensagensAutomaticas: false` explícito (correção pós-auditoria, item 2.1) —
+    // este é o caminho de balcão, o cliente não passou pelo opt-in do canal público.
+    const agendamento = await criarAgendamento(c.get("db"), { ...validacao.dados, aceitaMensagensAutomaticas: false });
     return c.json({ agendamento }, 201);
   } catch (erro) {
     if (erro instanceof BarbeiroInvalidoError || erro instanceof ServicoInvalidoError || erro instanceof ClienteInvalidoError) {

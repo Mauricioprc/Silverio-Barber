@@ -12,13 +12,17 @@ export const clientesRoutes = new Hono<AppContexto>();
 clientesRoutes.use("*", exigirLogin);
 
 clientesRoutes.get("/", async (c) => {
-  const query = listarClientesQuerySchema.safeParse({ busca: c.req.query("busca") });
+  const query = listarClientesQuerySchema.safeParse({
+    busca: c.req.query("busca"),
+    limite: c.req.query("limite"),
+    offset: c.req.query("offset"),
+  });
   if (!query.success) {
     return c.json({ erro: "Parâmetros inválidos.", detalhes: query.error.flatten() }, 400);
   }
 
-  const lista = await listarClientes(c.get("db"), query.data.busca);
-  return c.json({ clientes: lista });
+  const { itens, total } = await listarClientes(c.get("db"), query.data, query.data.busca);
+  return c.json({ clientes: itens, total, limite: query.data.limite, offset: query.data.offset });
 });
 
 clientesRoutes.post("/", async (c) => {

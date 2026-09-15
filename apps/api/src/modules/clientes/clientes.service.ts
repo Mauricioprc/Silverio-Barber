@@ -1,6 +1,7 @@
-import { eq, ilike, or } from "drizzle-orm";
+import { count, eq, ilike, or } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { clientes } from "../../db/schema";
+import type { PaginacaoInput } from "../../shared/http/paginacao.schema";
 import { gerarHashSenha } from "../../shared/senha/senha.util";
 import type { CriarClienteInput, EditarClienteInput } from "./clientes.schema";
 
@@ -28,12 +29,20 @@ function ehViolacaoDeTelefoneUnico(erro: unknown): boolean {
   return /clientes_telefone_unique/i.test(mensagem);
 }
 
-export async function listarClientes(db: Db, busca?: string) {
-  if (busca) {
-    const termo = `%${busca}%`;
-    return db.select().from(clientes).where(or(ilike(clientes.nome, termo), ilike(clientes.telefone, termo)));
-  }
-  return db.select().from(clientes);
+/**
+ * Paginado (correção pós-auditoria — ver `shared/http/paginacao.schema.ts`): devolve só
+ * a página pedida (`limite`/`offset`) mais `total` (contagem sem paginação, pra o
+ * chamador montar "página X de Y"), em vez da tabela inteira de uma vez.
+ */
+export async function listarClientes(db: Db, paginacao: PaginacaoInput, busca?: string) {
+  const condicao = busca ? or(ilike(clientes.nome, `%${busca}%`), ilike(clientes.telefone, `%${busca}%`)) : undefined;
+
+  const [itens, contagem] = await Promise.all([
+    db.select().from(clientes).where(condicao).limit(paginacao.limite).offset(paginacao.offset),
+    db.select({ total: count() }).from(clientes).where(condicao),
+  ]);
+
+  return { itens, total: contagem[0]?.total ?? 0 };
 }
 
 export async function criarCliente(db: Db, dados: CriarClienteInput) {

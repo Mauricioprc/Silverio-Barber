@@ -285,3 +285,25 @@ export const codigosVerificacao = pgTable("codigos_verificacao", {
   usadoEm: timestamp("usado_em", { withTimezone: true }),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Registro de tentativas de login/cadastro — defesa genérica de força-bruta/abuso
+ * (correção pós-auditoria, ver `07-auditoria-geral-backend.md`), mesmo raciocínio da
+ * regra 7 (limite por identificador + limite complementar por IP), reaproveitado para
+ * três contextos que não tinham nenhum rate-limiting: login de sócio, login de cliente e
+ * cadastro público (que, sem limite, permitia a qualquer um forçar
+ * `clientes.telefone_verificado` de volta para `false` repetidamente — ver
+ * `shared/rate-limit/rate-limite.util.ts`). Cada linha é uma tentativa (sucesso ou
+ * falha) — contar a tentativa em si, não só falhas, é o que impede um atacante de
+ * "gastar" tentativas de graça só porque acertou ou errou a credencial.
+ */
+export const tentativasAcesso = pgTable("tentativas_acesso", {
+  id: serial("id").primaryKey(),
+  // 'login_socio' | 'login_cliente' | 'cadastro_publico' — validado também via CHECK.
+  contexto: text("contexto").notNull(),
+  // Telefone envolvido na tentativa (quem está tentando logar, ou o telefone-alvo do
+  // cadastro) — mesmo campo usado como identificador nos dois contextos.
+  identificador: text("identificador").notNull(),
+  ip: text("ip").notNull(),
+  criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, sum } from "drizzle-orm";
+import { and, count, eq, gte, lt, sum } from "drizzle-orm";
 import type { DbOuTx, Db } from "../../db/client";
 import { lancamentosFinanceiros } from "../../db/schema";
 import type { FiltroFinanceiroInput } from "./financeiro.schema";
@@ -64,11 +64,20 @@ export async function obterResumo(db: Db, filtro: FiltroFinanceiroInput) {
   };
 }
 
+/**
+ * Paginado (correção pós-auditoria — ver `shared/http/paginacao.schema.ts`): sem filtro
+ * de `de`/`ate`, esta consulta trazia a tabela `lancamentos_financeiros` inteira, que só
+ * cresce com o volume do negócio (>1.000 agendamentos/mês). Devolve a página pedida mais
+ * `total` (contagem do filtro completo, sem paginação).
+ */
 export async function listarLancamentos(db: Db, filtro: FiltroFinanceiroInput) {
   const condicoes = condicoesDoPeriodo(filtro);
+  const onde = condicoes.length > 0 ? and(...condicoes) : undefined;
 
-  return db
-    .select()
-    .from(lancamentosFinanceiros)
-    .where(condicoes.length > 0 ? and(...condicoes) : undefined);
+  const [itens, contagem] = await Promise.all([
+    db.select().from(lancamentosFinanceiros).where(onde).limit(filtro.limite).offset(filtro.offset),
+    db.select({ total: count() }).from(lancamentosFinanceiros).where(onde),
+  ]);
+
+  return { itens, total: contagem[0]?.total ?? 0 };
 }

@@ -57,8 +57,17 @@ export async function listarAgendamentosDoDia(db: Db, barbeiroId: number, data: 
  * `ConflitoHorarioError` lançado por `inserirOcupacao` sobe para o chamador (a rota
  * traduz para 409) e a transação inteira é desfeita — nenhum agendamento órfão fica
  * gravado.
+ *
+ * `aceitaMensagensAutomaticas` não faz parte de `CriarAgendamentoInput` (o schema de
+ * balcão, `criarAgendamentoSchema`, não tem esse campo — ver comentário lá, correção
+ * pós-auditoria item 2.1): só `criarAgendamentoPublico` (canal público, onde o opt-in é
+ * de fato do próprio cliente) passa esse parâmetro como `true`. A rota de balcão
+ * (`agendamentos.routes.ts`) passa `false` explicitamente.
  */
-export async function criarAgendamento(db: Db, dados: CriarAgendamentoInput) {
+export async function criarAgendamento(
+  db: Db,
+  dados: CriarAgendamentoInput & { aceitaMensagensAutomaticas?: boolean }
+) {
   const [barbeiro] = await db
     .select({ id: barbeiros.id, ativo: barbeiros.ativo })
     .from(barbeiros)

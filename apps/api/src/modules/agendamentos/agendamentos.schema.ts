@@ -23,6 +23,18 @@ const telefoneSchema = z
  * `nomeCliente`/`telefoneCliente` do corpo — se vierem — são ignorados. Sem `clienteId`,
  * `nomeCliente`/`telefoneCliente` são obrigatórios (contato avulso, comportamento da
  * Fase 2 inalterado).
+ *
+ * Este schema é usado só pela rota de balcão (`agendamentos.routes.ts`, sócio logado) —
+ * de propósito, NÃO tem `aceitaMensagensAutomaticas` (correção pós-auditoria, ver
+ * `07-auditoria-geral-backend.md`, item 2.1): esse campo é opt-in do próprio cliente
+ * (regra 9), só existe no schema do canal público (`publico.schema.ts`,
+ * `agendamentoPublicoSchema`). Antes desta correção, como `criarAgendamento` aceitava o
+ * mesmo campo vindo de qualquer chamador, nada impedia um sócio (ou uma chamada direta à
+ * API) de marcar `true` num agendamento de balcão — cujo cliente nunca passou pelo fluxo
+ * de consentimento explícito — disparando lembrete automático sem opt-in real. A rota de
+ * balcão agora força `aceitaMensagensAutomaticas: false` explicitamente ao chamar o
+ * serviço (defesa em profundidade: mesmo que o campo volte a aparecer aqui por engano no
+ * futuro, o `false` explícito na rota ainda prevalece).
  */
 export const criarAgendamentoSchema = z
   .object({
@@ -32,10 +44,6 @@ export const criarAgendamentoSchema = z
     nomeCliente: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120).optional(),
     telefoneCliente: telefoneSchema.optional(),
     inicio: horarioLocalSchema,
-    // Regra 9 do documento de convenções — ver comentário em `db/schema.ts`. Omitido ou
-    // qualquer valor diferente de `true` é tratado como `false` (Zod já rejeita valores
-    // não-booleanos, então não há ambiguidade de "truthy" por string/número).
-    aceitaMensagensAutomaticas: z.boolean().optional(),
   })
   .refine((dados) => dados.clienteId !== undefined || (dados.nomeCliente !== undefined && dados.telefoneCliente !== undefined), {
     message: "Informe clienteId, ou nomeCliente e telefoneCliente.",
