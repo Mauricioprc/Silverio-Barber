@@ -7,6 +7,8 @@ import { useToast } from "../../../componentes/Toast";
 import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useCriarAgendamentoBalcao, conflitoDeHorario } from "../hooks/useMutacoesAgendamento";
 import { useHorariosDisponiveis } from "../../agendamento-publico/hooks/useHorariosDisponiveis";
+import { SeletorCliente } from "../../clientes/components/SeletorCliente";
+import type { Cliente } from "../../clientes/tipos";
 import type { BarbeiroInterno, ServicoInterno } from "../tipos";
 
 function horaCurta(horarioLocal: string): string {
@@ -25,17 +27,16 @@ type Props = {
 /**
  * Reaproveita a mesma consulta de disponibilidade da Fase 2 (`/publico/disponibilidade`,
  * pública, sem exigir sessão de cliente) em vez de duplicar a lógica de fatiar horários —
- * ver escopo da Fase 3. A diferença é só o schema do corpo enviado no fim
- * (`criarAgendamentoSchema` de balcão: `nomeCliente`/`telefoneCliente`, sem
- * `aceitaMensagensAutomaticas`, ver `useMutacoesAgendamento.ts`).
+ * ver escopo da Fase 3. Agendamento de balcão exige cliente cadastrado (via
+ * `SeletorCliente`, nunca nome/telefone avulsos) e nunca manda `aceitaMensagensAutomaticas`
+ * — ver `useMutacoesAgendamento.ts`.
  */
 export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servicos, barbeiroInicial, dataInicial }: Props) {
   const [barbeiroId, setBarbeiroId] = useState<number | null>(barbeiroInicial);
   const [servicoId, setServicoId] = useState<number | null>(null);
   const [data, setData] = useState(dataInicial);
   const [horarioEscolhido, setHorarioEscolhido] = useState<string | null>(null);
-  const [nomeCliente, setNomeCliente] = useState("");
-  const [telefoneCliente, setTelefoneCliente] = useState("");
+  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   const servico = servicos.find((s) => s.id === servicoId) ?? null;
@@ -51,8 +52,7 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
   function reiniciar() {
     setServicoId(null);
     setHorarioEscolhido(null);
-    setNomeCliente("");
-    setTelefoneCliente("");
+    setClienteSelecionado(null);
     setErro(null);
   }
 
@@ -62,10 +62,10 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
   }
 
   function aoConfirmar() {
-    if (!barbeiroId || !servicoId || !horarioEscolhido || !nomeCliente || !telefoneCliente) return;
+    if (!barbeiroId || !servicoId || !horarioEscolhido || !clienteSelecionado) return;
     setErro(null);
     criar.mutate(
-      { barbeiroId, servicoId, inicio: horarioEscolhido, nomeCliente, telefoneCliente },
+      { barbeiroId, servicoId, inicio: horarioEscolhido, clienteId: clienteSelecionado.id },
       {
         onSuccess: () => {
           mostrarToast("Agendamento criado.");
@@ -135,19 +135,13 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
           </div>
         )}
 
-        <Input rotulo="Nome do cliente" value={nomeCliente} onChange={(e) => setNomeCliente(e.target.value)} />
-        <Input
-          rotulo="Telefone do cliente"
-          type="tel"
-          value={telefoneCliente}
-          onChange={(e) => setTelefoneCliente(e.target.value)}
-          erro={erro ?? undefined}
-        />
+        <SeletorCliente clienteId={clienteSelecionado?.id ?? null} onSelecionar={setClienteSelecionado} />
+        {erro && <p className="text-sm text-red-400">{erro}</p>}
 
         <Botao
           onClick={aoConfirmar}
           carregando={criar.isPending}
-          disabled={!barbeiroId || !servicoId || !horarioEscolhido || !nomeCliente || !telefoneCliente}
+          disabled={!barbeiroId || !servicoId || !horarioEscolhido || !clienteSelecionado}
         >
           Criar agendamento
         </Botao>

@@ -7,7 +7,9 @@ export const criarServicoSchema = z.object({
   duracaoMinutos: z.number().int().positive("Duração precisa ser maior que zero."),
 });
 
-export const editarServicoSchema = criarServicoSchema.partial();
+export const editarServicoSchema = criarServicoSchema.partial().extend({
+  ativo: z.boolean().optional(),
+});
 
 export const listarServicosQuerySchema = z.object({
   ativos: z.enum(["1", "0"]).optional(),

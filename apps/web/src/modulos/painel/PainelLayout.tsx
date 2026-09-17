@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { CalendarDays, LogOut, Users, Wallet } from "lucide-react";
+import { CalendarDays, LogOut, Scissors, Users, Wallet } from "lucide-react";
 import { useAuthSocio } from "../../contextos/auth-socio-context";
 
 const ABAS = [
   { to: "/painel", rotulo: "Agenda", fim: true, Icone: CalendarDays },
   { to: "/painel/financeiro", rotulo: "Financeiro", fim: false, Icone: Wallet },
   { to: "/painel/clientes", rotulo: "Clientes", fim: false, Icone: Users },
+  { to: "/painel/servicos", rotulo: "Serviços", fim: false, Icone: Scissors },
 ];
 
 /** Ícone com tooltip que só aparece no hover — usado na sidebar de desktop (`md:` +), onde não há espaço pro rótulo ao lado. */

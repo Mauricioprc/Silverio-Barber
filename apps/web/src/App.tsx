@@ -17,6 +17,7 @@ const PainelLayout = lazy(() => import("./modulos/painel/PainelLayout"));
 const AgendaPage = lazy(() => import("./modulos/agenda/AgendaPage"));
 const FinanceiroPage = lazy(() => import("./modulos/financeiro/FinanceiroPage"));
 const ClientesPage = lazy(() => import("./modulos/clientes/ClientesPage"));
+const ServicosPage = lazy(() => import("./modulos/servicos/ServicosPage"));
 
 function CarregandoRota() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
                       <Route index element={<AgendaPage />} />
                       <Route path="financeiro" element={<FinanceiroPage />} />
                       <Route path="clientes" element={<ClientesPage />} />
+                      <Route path="servicos" element={<ServicosPage />} />
                     </Route>
                   </Route>
                 </Routes>
