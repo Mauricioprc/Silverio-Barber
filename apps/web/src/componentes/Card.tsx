@@ -19,8 +19,8 @@ export function Card({ className = "", onClick, onKeyDown, ...resto }: HTMLAttri
 
   return (
     <div
-      className={`rounded border border-base-700 bg-base-900 p-6 shadow-sm ${
-        interativo ? "focus-visible:outline focus-visible:outline-2 focus-visible:outline-destaque-500" : ""
+      className={`rounded-lg border border-base-500 bg-base-700 p-6 shadow-card transition-colors ${
+        interativo ? "hover:border-destaque-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-destaque-500" : ""
       } ${className}`}
       role={interativo ? "button" : undefined}
       tabIndex={interativo ? 0 : undefined}

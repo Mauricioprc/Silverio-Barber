@@ -34,6 +34,12 @@ export function fatiarIntervalosDisponiveis(intervalos: Intervalo[], duracaoMinu
   const passoMs = duracaoMinutos * 60_000;
   const slots: Intervalo[] = [];
 
+  // `duracaoMinutos` chega como 0 enquanto nenhum serviço foi escolhido ainda (ver
+  // `FormularioAgendamentoBalcao`, que monta este hook mesmo com o modal fechado) — sem
+  // essa guarda, `passoMs` zerado faz `inicioSlotMs` nunca avançar e o `while` abaixo
+  // nunca termina.
+  if (passoMs <= 0) return slots;
+
   for (const intervalo of intervalos) {
     const fimIntervaloMs = paraRelogioAuxiliar(intervalo.fim);
     let inicioSlotMs = paraRelogioAuxiliar(intervalo.inicio);

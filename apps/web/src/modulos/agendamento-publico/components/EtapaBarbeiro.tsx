@@ -30,7 +30,7 @@ export function EtapaBarbeiro({ onEscolher }: { onEscolher: (barbeiro: Barbeiro)
         <button
           key={barbeiro.id}
           onClick={() => onEscolher(barbeiro)}
-          className="rounded border border-base-700 bg-base-900 p-4 text-left font-medium transition-colors hover:border-destaque-500"
+          className="rounded border border-base-500 bg-base-700 p-4 text-left font-medium transition-colors hover:border-destaque-500"
         >
           {barbeiro.nome}
         </button>

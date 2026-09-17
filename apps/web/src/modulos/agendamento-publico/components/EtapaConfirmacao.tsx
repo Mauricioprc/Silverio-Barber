@@ -10,7 +10,7 @@ function formatarDataHora(horarioLocal: string): string {
 export function EtapaConfirmacao({ agendamento, selecao }: { agendamento: Agendamento; selecao: SelecaoAgendamento }) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
-      <h1 className="text-2xl font-semibold text-destaque-400">Agendamento confirmado!</h1>
+      <h1 className="text-2xl font-semibold text-destaque-600">Agendamento confirmado!</h1>
       <Card className="w-full text-left">
         <p>
           <span className="text-base-300">Serviço:</span> {selecao.servico?.nome}

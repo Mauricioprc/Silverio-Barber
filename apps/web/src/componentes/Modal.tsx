@@ -25,7 +25,10 @@ export function Modal({ titulo, aberto, onFechar, children }: Props) {
   if (!aberto) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onClick={onFechar}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onClick={onFechar}
+    >
       <div
         ref={conteudoRef}
         role="dialog"
@@ -33,9 +36,9 @@ export function Modal({ titulo, aberto, onFechar, children }: Props) {
         aria-label={titulo}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded border border-base-700 bg-base-900 p-6 shadow-lg outline-none"
+        className="w-full max-w-sm rounded-xl border border-base-500 bg-base-700 p-6 shadow-premium outline-none"
       >
-        <h2 className="mb-4 text-lg font-semibold">{titulo}</h2>
+        <h2 className="mb-4 font-serif text-lg font-semibold text-base-50">{titulo}</h2>
         {children}
       </div>
     </div>

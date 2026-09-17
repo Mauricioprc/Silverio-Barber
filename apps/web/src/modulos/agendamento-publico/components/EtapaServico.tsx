@@ -34,13 +34,13 @@ export function EtapaServico({ onEscolher }: { onEscolher: (servico: Servico) =>
         <button
           key={servico.id}
           onClick={() => onEscolher(servico)}
-          className="flex items-center justify-between rounded border border-base-700 bg-base-900 p-4 text-left transition-colors hover:border-destaque-500"
+          className="flex items-center justify-between rounded border border-base-500 bg-base-700 p-4 text-left transition-colors hover:border-destaque-500"
         >
           <div>
             <p className="font-medium">{servico.nome}</p>
             <p className="text-sm text-base-300">{servico.duracaoMinutos} min</p>
           </div>
-          <span className="font-semibold text-destaque-400">{formatarReais(servico.valorCentavos)}</span>
+          <span className="font-semibold text-destaque-600">{formatarReais(servico.valorCentavos)}</span>
         </button>
       ))}
     </div>

@@ -16,7 +16,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(({ rotulo, erro, id, cl
       <input
         id={inputId}
         ref={ref}
-        className={`rounded border bg-base-700 px-3 py-2 text-base-50 outline-none focus:ring-2 focus:ring-destaque-500 ${
+        className={`rounded-sm border bg-base-700 px-3 py-2 text-base-50 outline-none transition-colors placeholder:text-base-300/60 focus:border-destaque-500 focus:ring-1 focus:ring-destaque-500 ${
           erro ? "border-red-500" : "border-base-500"
         } ${className}`}
         aria-invalid={Boolean(erro)}

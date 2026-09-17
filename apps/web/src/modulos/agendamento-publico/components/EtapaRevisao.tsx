@@ -79,9 +79,9 @@ export function EtapaRevisao({ selecao, onAlterarOptIn, onConfirmado, onPrecisaV
           <span className="text-base-300">Quando</span>
           <span className="font-medium">{formatarDataHora(horario.inicio)}</span>
         </div>
-        <div className="flex justify-between border-t border-base-700 pt-2">
+        <div className="flex justify-between border-t border-base-500 pt-2">
           <span className="text-base-300">Valor</span>
-          <span className="font-semibold text-destaque-400">{formatarReais(servico.valorCentavos)}</span>
+          <span className="font-semibold text-destaque-600">{formatarReais(servico.valorCentavos)}</span>
         </div>
       </Card>
 

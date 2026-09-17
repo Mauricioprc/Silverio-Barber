@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply bg-base-900 text-base-50 font-sans antialiased;
+  @apply bg-base-100 text-base-50 font-sans antialiased;
 }
 
 /* Revisão de acessibilidade (Fase 5): respeita a preferência do sistema por menos

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CalendarOff, Plus } from "lucide-react";
 import { useBarbeirosInternos } from "./hooks/useBarbeirosInternos";
 import { useServicosInternos } from "./hooks/useServicosInternos";
 import { useAgendamentosDoDia } from "./hooks/useAgendamentosDoDia";
@@ -36,18 +37,20 @@ export default function AgendaPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Agenda</h1>
+        <h1 className="font-serif text-2xl font-semibold text-base-50">Agenda</h1>
         <div className="flex gap-2">
           <Botao variante="secundaria" onClick={() => setBloqueiosAberto(true)}>
+            <CalendarOff className="h-4 w-4" aria-hidden="true" />
             Bloqueios
           </Botao>
           <Botao onClick={() => setNovoAgendamentoAberto(true)} disabled={!barbeiroId}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
             Novo agendamento
           </Botao>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-base-500 bg-base-700 p-3">
         <SeletorData data={data} onMudar={setData} />
         {carregandoBarbeiros ? (
           <Skeleton className="h-10 w-40" />

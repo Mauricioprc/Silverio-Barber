@@ -56,7 +56,7 @@ export function EtapaHorario({ barbeiroId, dataInicial, duracaoMinutos, onEscolh
             <button
               key={horario.inicio}
               onClick={() => onEscolher(data, horario)}
-              className="rounded border border-base-700 bg-base-900 py-2 text-sm transition-colors hover:border-destaque-500"
+              className="rounded border border-base-500 bg-base-700 py-2 text-sm transition-colors hover:border-destaque-500"
             >
               {horaCurta(horario.inicio)}
             </button>

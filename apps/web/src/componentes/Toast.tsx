@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 type Toast = { id: number; mensagem: string; tipo: "sucesso" | "erro" };
 type ToastContextValor = { mostrarToast: (mensagem: string, tipo?: Toast["tipo"]) => void };
@@ -26,11 +27,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             role="status"
-            className={`rounded px-4 py-3 text-sm shadow-lg ${
-              toast.tipo === "erro" ? "bg-red-600 text-white" : "bg-destaque-500 text-base-900"
+            className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium shadow-premium ${
+              toast.tipo === "erro"
+                ? "border-red-500/30 bg-base-700 text-red-600"
+                : "border-destaque-500/30 bg-base-700 text-destaque-600"
             }`}
           >
-            {toast.mensagem}
+            {toast.tipo === "erro" ? (
+              <XCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            )}
+            <span className="text-base-50">{toast.mensagem}</span>
           </div>
         ))}
       </div>
