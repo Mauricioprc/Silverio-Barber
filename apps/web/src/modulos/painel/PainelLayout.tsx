@@ -29,14 +29,14 @@ function ItemSidebar({ to, fim, rotulo, Icone }: (typeof ABAS)[number]) {
   );
 }
 
-/** Item da barra inferior de mobile — ícone + rótulo sempre visíveis (touch não tem hover pra depender de tooltip). */
+/** Item da barra flutuante de mobile — ícone + rótulo sempre visíveis (touch não tem hover pra depender de tooltip). */
 function ItemBarraInferior({ to, fim, rotulo, Icone }: (typeof ABAS)[number]) {
   return (
     <NavLink
       to={to}
       end={fim}
       className={({ isActive }) =>
-        `flex flex-1 flex-col items-center gap-0.5 py-2 text-xs font-medium transition-colors ${
+        `flex flex-1 flex-col items-center gap-0.5 rounded-full py-1.5 text-[11px] font-medium transition-colors ${
           isActive ? "text-destaque-500" : "text-white/60"
         }`
       }
@@ -99,13 +99,13 @@ export default function PainelLayout() {
           <span className="text-xs text-white/50">{socio?.nome}</span>
         </header>
 
-        {/* Conteúdo ganha respiro embaixo no mobile pra barra inferior fixa não cobrir nada. */}
-        <div className="pb-20 md:pb-0">
+        {/* Conteúdo ganha respiro embaixo no mobile pra barra flutuante não cobrir nada. */}
+        <div className="pb-24 md:pb-0">
           <Outlet />
         </div>
 
-        {/* Barra inferior de mobile (< md): ações principais de navegação ao alcance do polegar. */}
-        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-white/10 bg-base-900 pb-[env(safe-area-inset-bottom)] md:hidden">
+        {/* Barra flutuante de mobile (< md): destacada das bordas, cantos arredondados, sombra — ações principais ao alcance do polegar. */}
+        <nav className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-sm items-center justify-around rounded-full bg-base-900 px-2 py-1.5 shadow-premium md:hidden">
           {ABAS.map((aba) => (
             <ItemBarraInferior key={aba.to} {...aba} />
           ))}
