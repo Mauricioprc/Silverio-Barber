@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "../lib/api-client";
 
-type Socio = { id: number; nome: string; telefone: string };
+type Socio = { id: number; nome: string; telefone: string; admin: boolean };
 
 type AuthSocioContextValor = {
   socio: Socio | null;
@@ -19,7 +19,9 @@ type AuthSocioContextValor = {
  */
 const AuthSocioContext = createContext<AuthSocioContextValor | null>(null);
 
-const CHAVE_QUERY_EU = ["auth-socio", "eu"] as const;
+// Exportada pra hooks fora deste arquivo poderem invalidar (ex.: `useAtualizarPerfil`,
+// depois de `PUT /auth/me` mudar nome/telefone do sócio logado).
+export const CHAVE_QUERY_EU = ["auth-socio", "eu"] as const;
 
 export function AuthSocioProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();

@@ -5,13 +5,19 @@ import { validarCorpo } from "../../shared/http/validar";
 import { obterIp } from "../../shared/http/ip.util";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
 import { LIMITE_LOGIN, LimiteTentativasError, verificarLimiteTentativas } from "../../shared/rate-limit/rate-limite.util";
-import { NOME_COOKIE_SESSAO, criarSessao, destruirSessao } from "../../shared/sessao/sessao.util";
-import { loginSchema, registrarSocioSchema } from "./auth.schema";
+import { NOME_COOKIE_SESSAO, criarSessao, destruirOutrasSessoes, destruirSessao } from "../../shared/sessao/sessao.util";
+import { alterarSenhaSchema, atualizarMeuPerfilSchema, loginSchema, registrarAdminSchema, registrarSocioSchema } from "./auth.schema";
 import {
+  AdminJaCadastradoError,
   BootstrapEncerradoError,
   CredenciaisInvalidasError,
+  SenhaAtualIncorretaError,
+  TelefoneJaCadastradoError,
+  alterarSenha,
+  atualizarMeuPerfil,
   autenticar,
   obterUsuarioPorId,
+  registrarAdmin,
   registrarSocio,
 } from "./auth.service";
 
@@ -40,6 +46,24 @@ authRoutes.post("/registrar-socio", async (c) => {
     // resultar em 403 de bootstrap encerrado, não em 500 genérico.
     if (erro instanceof Error && /unique/i.test(erro.message)) {
       return c.json({ erro: "Cadastro de sócio já foi concluído." }, 403);
+    }
+    throw erro;
+  }
+});
+
+authRoutes.post("/registrar-admin", async (c) => {
+  const validacao = await validarCorpo(c, registrarAdminSchema);
+  if (validacao.dados === null) return validacao.resposta;
+
+  try {
+    const { usuario } = await registrarAdmin(c.get("db"), validacao.dados);
+    return c.json({ usuario }, 201);
+  } catch (erro) {
+    if (erro instanceof AdminJaCadastradoError) {
+      return c.json({ erro: erro.message }, 403);
+    }
+    if (erro instanceof Error && /unique/i.test(erro.message)) {
+      return c.json({ erro: "Já existe uma conta com esse telefone." }, 403);
     }
     throw erro;
   }
@@ -90,4 +114,54 @@ authRoutes.post("/logout", exigirLogin, async (c) => {
   }
   deleteCookie(c, NOME_COOKIE_SESSAO, { path: "/" });
   return c.json({ ok: true });
+});
+
+// Edição do próprio perfil (nome/telefone) — usada pelo painel de "Meu perfil". Trocar
+// telefone (é o login) derruba as outras sessões ativas depois de salvar.
+authRoutes.put("/me", exigirLogin, async (c) => {
+  const validacao = await validarCorpo(c, atualizarMeuPerfilSchema);
+  if (validacao.dados === null) return validacao.resposta;
+
+  try {
+    const usuario = await atualizarMeuPerfil(c.get("db"), c.get("usuarioId")!, validacao.dados);
+
+    if (validacao.dados.telefone !== undefined) {
+      const token = await getSignedCookie(c, c.env.SESSAO_SECRETO, NOME_COOKIE_SESSAO);
+      if (token) await destruirOutrasSessoes(c.get("db"), usuario.id, token);
+    }
+
+    return c.json({ usuario });
+  } catch (erro) {
+    if (erro instanceof SenhaAtualIncorretaError) {
+      // 400, não 401: 401 nesta app significa "sessão expirada" pro front
+      // (`mensagemHumana`) — "senha atual errada" é um erro de validação do formulário,
+      // não um problema de sessão (achado testando o formulário de telefone/senha).
+      return c.json({ erro: erro.message }, 400);
+    }
+    if (erro instanceof TelefoneJaCadastradoError) {
+      return c.json({ erro: erro.message }, 409);
+    }
+    throw erro;
+  }
+});
+
+// Troca de senha — sempre derruba as outras sessões ativas depois de confirmar.
+authRoutes.put("/senha", exigirLogin, async (c) => {
+  const validacao = await validarCorpo(c, alterarSenhaSchema);
+  if (validacao.dados === null) return validacao.resposta;
+
+  try {
+    const usuarioId = c.get("usuarioId")!;
+    await alterarSenha(c.get("db"), usuarioId, validacao.dados);
+
+    const token = await getSignedCookie(c, c.env.SESSAO_SECRETO, NOME_COOKIE_SESSAO);
+    if (token) await destruirOutrasSessoes(c.get("db"), usuarioId, token);
+
+    return c.json({ ok: true });
+  } catch (erro) {
+    if (erro instanceof SenhaAtualIncorretaError) {
+      return c.json({ erro: erro.message }, 400); // ver comentário equivalente em PUT /me
+    }
+    throw erro;
+  }
 });

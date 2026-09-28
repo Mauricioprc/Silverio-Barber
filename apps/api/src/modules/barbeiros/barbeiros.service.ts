@@ -10,7 +10,12 @@ export class BarbeiroNaoEncontradoError extends Error {
   }
 }
 
-export async function listarBarbeiros(db: Db) {
+/**
+ * `filtroBarbeiroId` restringe o resultado a um único registro — usado pra não-admin, que
+ * só pode ver o próprio (ver `barbeiros.routes.ts`, `escopo.barbeiroId`). Admin chama sem
+ * esse filtro e recebe a lista inteira, como sempre.
+ */
+export async function listarBarbeiros(db: Db, filtroBarbeiroId?: number) {
   return db
     .select({
       id: barbeiros.id,
@@ -20,7 +25,8 @@ export async function listarBarbeiros(db: Db) {
       telefone: usuarios.telefone,
     })
     .from(barbeiros)
-    .innerJoin(usuarios, eq(barbeiros.usuarioId, usuarios.id));
+    .innerJoin(usuarios, eq(barbeiros.usuarioId, usuarios.id))
+    .where(filtroBarbeiroId !== undefined ? eq(barbeiros.id, filtroBarbeiroId) : undefined);
 }
 
 async function existeBarbeiro(db: Db, barbeiroId: number): Promise<boolean> {
@@ -28,8 +34,32 @@ async function existeBarbeiro(db: Db, barbeiroId: number): Promise<boolean> {
   return Boolean(encontrado);
 }
 
-export async function atualizarAtivoBarbeiro(db: Db, barbeiroId: number, ativo: boolean) {
-  const [barbeiro] = await db.update(barbeiros).set({ ativo }).where(eq(barbeiros.id, barbeiroId)).returning();
+/**
+ * `nome` atualiza `usuarios.nome` (via `usuarioId` do barbeiro) — feito fora de transação
+ * porque as duas escritas são independentes e nenhuma delas precisa desfazer a outra se a
+ * segunda falhar.
+ */
+export async function atualizarBarbeiro(db: Db, barbeiroId: number, dados: { ativo?: boolean; nome?: string }) {
+  const [existente] = await db.select({ usuarioId: barbeiros.usuarioId }).from(barbeiros).where(eq(barbeiros.id, barbeiroId)).limit(1);
+  if (!existente) {
+    throw new BarbeiroNaoEncontradoError();
+  }
+
+  if (dados.ativo !== undefined) {
+    await db.update(barbeiros).set({ ativo: dados.ativo }).where(eq(barbeiros.id, barbeiroId));
+  }
+
+  if (dados.nome !== undefined) {
+    await db.update(usuarios).set({ nome: dados.nome }).where(eq(usuarios.id, existente.usuarioId));
+  }
+
+  const [barbeiro] = await db
+    .select({ id: barbeiros.id, usuarioId: barbeiros.usuarioId, ativo: barbeiros.ativo, nome: usuarios.nome, telefone: usuarios.telefone })
+    .from(barbeiros)
+    .innerJoin(usuarios, eq(barbeiros.usuarioId, usuarios.id))
+    .where(eq(barbeiros.id, barbeiroId))
+    .limit(1);
+
   if (!barbeiro) throw new BarbeiroNaoEncontradoError();
   return barbeiro;
 }

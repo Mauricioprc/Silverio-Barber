@@ -17,11 +17,20 @@ export type Env = {
   WHATSAPP_TEMPLATE_LEMBRETE?: string;
 };
 
+/**
+ * Escopo de autorização do usuário logado, resolvido uma vez por requisição em
+ * `exigirLogin` e reaproveitado por todas as rotas (ver `shared/auth/exigir-dono-ou-admin.ts`).
+ * `barbeiroId` é `null` pra conta admin (não tem linha em `barbeiros`) — nesse caso
+ * `admin` já é `true` e nenhuma rota deveria olhar pra `barbeiroId`.
+ */
+export type EscopoAutorizacao = { admin: boolean; barbeiroId: number | null };
+
 /** Estado por requisição, disponível em `c.get(...)` dentro das rotas Hono. */
 export type Variaveis = {
   db: Db;
   usuarioId: number | null;
   clienteId: number | null;
+  escopo: EscopoAutorizacao | null;
 };
 
 export type AppContexto = {

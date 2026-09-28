@@ -17,6 +17,24 @@ type Props = {
 };
 
 export function FiltroPeriodo({ periodo, onMudarPeriodo, barbeiroId, onMudarBarbeiro, barbeiros }: Props) {
+  // Sócio não-admin só enxerga o próprio registro (`GET /barbeiros` já vem escopado do
+  // back-end) — "Todos (consolidado)" seria enganoso aqui, já que o dado mostrado já é só
+  // o dele mesmo. Mostra um rótulo fixo em vez de um seletor sem escolha real.
+  if (barbeiros.length <= 1) {
+    return (
+      <div className="flex flex-wrap items-end gap-3">
+        <Select rotulo="Período" value={periodo} onChange={(e) => onMudarPeriodo(e.target.value as Periodo)}>
+          {OPCOES.map((o) => (
+            <option key={o.valor} value={o.valor}>
+              {o.rotulo}
+            </option>
+          ))}
+        </Select>
+        {barbeiros[0] && <p className="pb-2 text-sm text-base-300">Faturamento de {barbeiros[0].nome}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap gap-3">
       <Select rotulo="Período" value={periodo} onChange={(e) => onMudarPeriodo(e.target.value as Periodo)}>

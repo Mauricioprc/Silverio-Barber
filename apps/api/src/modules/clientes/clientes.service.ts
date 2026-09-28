@@ -1,8 +1,9 @@
-import { count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { agendamentos, clientes } from "../../db/schema";
 import type { PaginacaoInput } from "../../shared/http/paginacao.schema";
 import { gerarHashSenha } from "../../shared/senha/senha.util";
+import type { EscopoAutorizacao } from "../../shared/tipos";
 import type { CriarClienteInput, EditarClienteInput } from "./clientes.schema";
 
 export class TelefoneJaCadastradoError extends Error {
@@ -20,6 +21,23 @@ export class ClienteNaoEncontradoError extends Error {
     super("Cliente não encontrado.");
     this.name = "ClienteNaoEncontradoError";
   }
+}
+
+export class AcessoNegadoError extends Error {
+  constructor() {
+    super("Você só pode acessar clientes que já atendeu.");
+    this.name = "AcessoNegadoError";
+  }
+}
+
+/** `true` se o cliente já teve pelo menos um agendamento com este barbeiro. */
+async function clienteJaAtendidoPor(db: Db, clienteId: number, barbeiroId: number): Promise<boolean> {
+  const [linha] = await db
+    .select({ id: agendamentos.id })
+    .from(agendamentos)
+    .where(and(eq(agendamentos.clienteId, clienteId), eq(agendamentos.barbeiroId, barbeiroId)))
+    .limit(1);
+  return Boolean(linha);
 }
 
 function ehViolacaoDeTelefoneUnico(erro: unknown): boolean {
@@ -40,8 +58,26 @@ function ehViolacaoDeTelefoneUnico(erro: unknown): boolean {
  * projetavam campos seguros. Descoberto ao construir a tela de busca de clientes do
  * painel, que teria vazado hash de senha pro browser do sócio a cada busca.
  */
-export async function listarClientes(db: Db, paginacao: PaginacaoInput, busca?: string) {
-  const condicao = busca ? or(ilike(clientes.nome, `%${busca}%`), ilike(clientes.telefone, `%${busca}%`)) : undefined;
+/**
+ * `filtroBarbeiroId`, quando informado, restringe aos clientes que já têm pelo menos um
+ * agendamento com esse barbeiro (`clientes` é uma tabela global, sem coluna de dono — a
+ * única ligação com um barbeiro é indireta, via `agendamentos`). Usado pela tela de gestão
+ * de clientes quando quem chama não é admin; a busca do balcão nunca passa esse filtro
+ * (ver `clientes.routes.ts`).
+ */
+export async function listarClientes(db: Db, paginacao: PaginacaoInput, busca?: string, filtroBarbeiroId?: number) {
+  const condicoes = [];
+  if (busca) condicoes.push(or(ilike(clientes.nome, `%${busca}%`), ilike(clientes.telefone, `%${busca}%`)));
+  if (filtroBarbeiroId !== undefined) {
+    condicoes.push(
+      inArray(
+        clientes.id,
+        db.select({ id: agendamentos.clienteId }).from(agendamentos).where(eq(agendamentos.barbeiroId, filtroBarbeiroId))
+      )
+    );
+  }
+  const condicao = condicoes.length > 0 ? and(...condicoes) : undefined;
+
   const colunas = {
     id: clientes.id,
     nome: clientes.nome,
@@ -80,22 +116,38 @@ export async function criarCliente(db: Db, dados: CriarClienteInput) {
  * `barbeiro_id`+`data`, pensado pra visão diária do balcão, não pra histórico de um
  * cliente). Paginado desde o início, mesmo padrão de `listarClientes`.
  */
-export async function listarAgendamentosDoCliente(db: Db, clienteId: number, limite: number, offset: number) {
+/**
+ * `filtroBarbeiroId`, quando informado, restringe o histórico aos agendamentos desse
+ * barbeiro — sem isso, um sócio não-admin olhando o histórico de um cliente compartilhado
+ * veria também os agendamentos que esse cliente teve com o *outro* sócio.
+ */
+export async function listarAgendamentosDoCliente(
+  db: Db,
+  clienteId: number,
+  limite: number,
+  offset: number,
+  filtroBarbeiroId?: number
+) {
+  const condicao =
+    filtroBarbeiroId !== undefined
+      ? and(eq(agendamentos.clienteId, clienteId), eq(agendamentos.barbeiroId, filtroBarbeiroId))
+      : eq(agendamentos.clienteId, clienteId);
+
   const [itens, contagem] = await Promise.all([
-    db
-      .select()
-      .from(agendamentos)
-      .where(eq(agendamentos.clienteId, clienteId))
-      .orderBy(desc(agendamentos.inicio))
-      .limit(limite)
-      .offset(offset),
-    db.select({ total: count() }).from(agendamentos).where(eq(agendamentos.clienteId, clienteId)),
+    db.select().from(agendamentos).where(condicao).orderBy(desc(agendamentos.inicio)).limit(limite).offset(offset),
+    db.select({ total: count() }).from(agendamentos).where(condicao),
   ]);
 
   return { itens, total: contagem[0]?.total ?? 0 };
 }
 
-export async function editarCliente(db: Db, id: number, dados: EditarClienteInput) {
+export async function editarCliente(db: Db, id: number, dados: EditarClienteInput, escopo: EscopoAutorizacao) {
+  if (!escopo.admin) {
+    if (escopo.barbeiroId === null || !(await clienteJaAtendidoPor(db, id, escopo.barbeiroId))) {
+      throw new AcessoNegadoError();
+    }
+  }
+
   const valores: Partial<typeof clientes.$inferInsert> = {};
   if (dados.nome !== undefined) valores.nome = dados.nome;
   if (dados.telefone !== undefined) valores.telefone = dados.telefone;

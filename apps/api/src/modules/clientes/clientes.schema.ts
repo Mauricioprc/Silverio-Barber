@@ -18,9 +18,16 @@ export const editarClienteSchema = z
     message: "Informe ao menos um campo: nome, telefone ou senha.",
   });
 
+/**
+ * `escopo=proprio` é opt-in, só usado pela tela de gestão de clientes (`ClientesPage`) —
+ * o balcão (`SeletorCliente`, busca de cliente ao criar agendamento) nunca manda esse
+ * parâmetro, de propósito: precisa achar qualquer cliente já cadastrado, mesmo um que só
+ * foi atendido pelo outro sócio, senão duplicaria o cadastro (ver `clientes.routes.ts`).
+ */
 export const listarClientesQuerySchema = z
   .object({
     busca: z.string().trim().min(1).optional(),
+    escopo: z.enum(["proprio"]).optional(),
   })
   .merge(paginacaoQuerySchema);
 

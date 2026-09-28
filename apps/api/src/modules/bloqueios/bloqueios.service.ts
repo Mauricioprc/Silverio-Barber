@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { barbeiros, bloqueiosAgenda } from "../../db/schema";
 import { inserirOcupacao, removerOcupacaoDeBloqueio } from "../../shared/ocupacao/ocupacao.util";
+import { ehDonoOuAdmin } from "../../shared/auth/exigir-dono-ou-admin";
+import type { EscopoAutorizacao } from "../../shared/tipos";
 import type { CriarBloqueioInput } from "./bloqueios.schema";
 
 export class BarbeiroInvalidoError extends Error {
@@ -15,6 +17,13 @@ export class BloqueioNaoEncontradoError extends Error {
   constructor() {
     super("Bloqueio não encontrado.");
     this.name = "BloqueioNaoEncontradoError";
+  }
+}
+
+export class AcessoNegadoError extends Error {
+  constructor() {
+    super("Você só pode acessar seus próprios dados.");
+    this.name = "AcessoNegadoError";
   }
 }
 
@@ -69,7 +78,15 @@ export async function criarBloqueio(db: Db, dados: CriarBloqueioInput) {
  * bloqueio é só uma marcação de indisponibilidade, não um dado financeiro/histórico; ver
  * README). Remove também a linha de ocupação correspondente, na mesma transação.
  */
-export async function removerBloqueio(db: Db, id: number) {
+export async function removerBloqueio(db: Db, id: number, escopo: EscopoAutorizacao) {
+  const [existente] = await db.select({ barbeiroId: bloqueiosAgenda.barbeiroId }).from(bloqueiosAgenda).where(eq(bloqueiosAgenda.id, id)).limit(1);
+  if (!existente) {
+    throw new BloqueioNaoEncontradoError();
+  }
+  if (!ehDonoOuAdmin(escopo, existente.barbeiroId)) {
+    throw new AcessoNegadoError();
+  }
+
   return db.transaction(async (tx) => {
     // A linha de ocupação referencia o bloqueio via FK — precisa ser removida antes,
     // senão a exclusão do bloqueio violaria a constraint de chave estrangeira.

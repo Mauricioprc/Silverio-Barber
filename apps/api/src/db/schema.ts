@@ -20,6 +20,15 @@ export const usuarios = pgTable("usuarios", {
   nome: text("nome").notNull(),
   telefone: text("telefone").notNull().unique(),
   senhaHash: text("senha_hash").notNull(),
+  /**
+   * Conta de retaguarda com acesso a tudo (Agenda/Clientes/Financeiro/Barbeiros de todos
+   * os sócios) — não é um sócio-barbeiro: nunca tem linha correspondente em `barbeiros`
+   * (não corta cabelo, não aparece no agendamento público, não tem disponibilidade).
+   * Sócios comuns ficam com `admin = false` e só enxergam os próprios dados (ver
+   * `shared/middleware/exigir-login.ts`, que resolve o escopo de autorização a partir
+   * deste campo).
+   */
+  admin: boolean("admin").notNull().default(false),
   criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 

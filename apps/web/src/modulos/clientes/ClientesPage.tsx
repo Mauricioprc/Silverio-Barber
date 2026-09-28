@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuthSocio } from "../../contextos/auth-socio-context";
 import { useDebounce } from "../../lib/useDebounce";
 import { useClientes } from "./hooks/useClientes";
 import { FormularioNovoCliente } from "./components/FormularioNovoCliente";
@@ -11,9 +12,11 @@ import { EstadoVazio } from "../../componentes/EstadoVazio";
 import type { Cliente } from "./tipos";
 
 export default function ClientesPage() {
+  const { socio } = useAuthSocio();
   const [busca, setBusca] = useState("");
   const buscaComDebounce = useDebounce(busca);
-  const { data: clientes, isLoading } = useClientes(buscaComDebounce);
+  // Não-admin só vê, nesta tela de gestão, os clientes que já atendeu (ver `useClientes`).
+  const { data: clientes, isLoading } = useClientes(buscaComDebounce, !socio?.admin);
   const [novoClienteAberto, setNovoClienteAberto] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
 

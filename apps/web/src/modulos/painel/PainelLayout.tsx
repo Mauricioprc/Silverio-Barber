@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { CalendarDays, LogOut, Scissors, Users, Wallet } from "lucide-react";
+import { CalendarDays, IdCard, LogOut, Scissors, Users, Wallet } from "lucide-react";
 import { useAuthSocio } from "../../contextos/auth-socio-context";
 
 const ABAS = [
   { to: "/painel", rotulo: "Agenda", fim: true, Icone: CalendarDays },
+  { to: "/painel/barbeiros", rotulo: "Barbeiros", fim: false, Icone: IdCard },
   { to: "/painel/financeiro", rotulo: "Financeiro", fim: false, Icone: Wallet },
   { to: "/painel/clientes", rotulo: "Clientes", fim: false, Icone: Users },
   { to: "/painel/servicos", rotulo: "Serviços", fim: false, Icone: Scissors },

@@ -3,8 +3,10 @@ import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
 import { ConflitoHorarioError } from "../../shared/ocupacao/ocupacao.util";
+import { ERRO_ACESSO_NEGADO, barbeiroIdForcado } from "../../shared/auth/exigir-dono-ou-admin";
 import { criarAgendamentoSchema, editarAgendamentoSchema, listarAgendamentosQuerySchema } from "./agendamentos.schema";
 import {
+  AcessoNegadoError,
   AgendamentoNaoEncontradoError,
   BarbeiroInvalidoError,
   ClienteInvalidoError,
@@ -29,7 +31,13 @@ agendamentosRoutes.get("/", async (c) => {
     return c.json({ erro: "Parâmetros inválidos.", detalhes: query.error.flatten() }, 400);
   }
 
-  const lista = await listarAgendamentosDoDia(c.get("db"), query.data.barbeiro_id, query.data.data);
+  // Não-admin: o `barbeiro_id` pedido é ignorado, sempre força o próprio (ver
+  // `shared/auth/exigir-dono-ou-admin.ts`) — não dá pra ver a agenda de outro sócio
+  // mandando outro id na query.
+  const barbeiroId = barbeiroIdForcado(c.get("escopo")!, query.data.barbeiro_id);
+  if (barbeiroId === null) return c.json({ erro: "barbeiro_id é obrigatório." }, 400);
+
+  const lista = await listarAgendamentosDoDia(c.get("db"), barbeiroId, query.data.data);
   return c.json({ agendamentos: lista });
 });
 
@@ -37,10 +45,18 @@ agendamentosRoutes.post("/", async (c) => {
   const validacao = await validarCorpo(c, criarAgendamentoSchema);
   if (validacao.dados === null) return validacao.resposta;
 
+  // Mesma lógica de força: não-admin só cria agendamento na própria agenda, mesmo que o
+  // corpo peça outro `barbeiroId`.
+  const barbeiroId = barbeiroIdForcado(c.get("escopo")!, validacao.dados.barbeiroId)!;
+
   try {
     // `aceitaMensagensAutomaticas: false` explícito (correção pós-auditoria, item 2.1) —
     // este é o caminho de balcão, o cliente não passou pelo opt-in do canal público.
-    const agendamento = await criarAgendamento(c.get("db"), { ...validacao.dados, aceitaMensagensAutomaticas: false });
+    const agendamento = await criarAgendamento(c.get("db"), {
+      ...validacao.dados,
+      barbeiroId,
+      aceitaMensagensAutomaticas: false,
+    });
     return c.json({ agendamento }, 201);
   } catch (erro) {
     if (erro instanceof BarbeiroInvalidoError || erro instanceof ServicoInvalidoError || erro instanceof ClienteInvalidoError) {
@@ -61,11 +77,16 @@ agendamentosRoutes.put("/:id", async (c) => {
   if (validacao.dados === null) return validacao.resposta;
 
   try {
-    const agendamento = await editarAgendamento(c.get("db"), id, validacao.dados);
+    // Checagem de dono acontece dentro do service, na mesma transação que lê o
+    // agendamento atual — evita reconsultar e uma corrida entre checar e editar.
+    const agendamento = await editarAgendamento(c.get("db"), id, validacao.dados, c.get("escopo")!);
     return c.json({ agendamento });
   } catch (erro) {
     if (erro instanceof AgendamentoNaoEncontradoError) {
       return c.json({ erro: erro.message }, 404);
+    }
+    if (erro instanceof AcessoNegadoError) {
+      return c.json({ erro: ERRO_ACESSO_NEGADO }, 403);
     }
     if (erro instanceof BarbeiroInvalidoError) {
       return c.json({ erro: erro.message }, 400);
@@ -86,6 +107,10 @@ agendamentosRoutes.get("/:id/link-whatsapp", async (c) => {
 
   try {
     const dados = await obterDadosParaMensagem(c.get("db"), id);
+    const escopo = c.get("escopo")!;
+    if (!escopo.admin && escopo.barbeiroId !== dados.barbeiroId) {
+      return c.json({ erro: ERRO_ACESSO_NEGADO }, 403);
+    }
     const url = montarLinkWhatsapp(dados);
     return c.json({ url });
   } catch (erro) {

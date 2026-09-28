@@ -54,6 +54,10 @@ export default function AgendaPage() {
         <SeletorData data={data} onMudar={setData} />
         {carregandoBarbeiros ? (
           <Skeleton className="h-10 w-40" />
+        ) : barbeiros && barbeiros.length <= 1 ? (
+          // Sócio não-admin só tem a própria agenda pra ver — nada pra escolher (ver
+          // `useBarbeirosInternos`, já escopado do back-end).
+          <p className="text-sm text-base-300">Agenda de {barbeiros[0]?.nome ?? "—"}</p>
         ) : (
           <Select
             rotulo="Barbeiro"

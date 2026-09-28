@@ -20,8 +20,17 @@ export const substituirDisponibilidadeSchema = z.object({
   disponibilidade: z.array(faixaDisponibilidadeSchema),
 });
 
-export const atualizarBarbeiroSchema = z.object({
-  ativo: z.boolean(),
-});
+/**
+ * `nome` aqui edita `usuarios.nome` (o nome é da conta, não da linha de barbeiro) — é
+ * como o admin renomeia outro sócio, já que `PUT /auth/me` só edita a própria conta.
+ */
+export const atualizarBarbeiroSchema = z
+  .object({
+    ativo: z.boolean().optional(),
+    nome: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120).optional(),
+  })
+  .refine((dados) => dados.ativo !== undefined || dados.nome !== undefined, {
+    message: "Informe ao menos um campo: ativo ou nome.",
+  });
 
 export type SubstituirDisponibilidadeInput = z.infer<typeof substituirDisponibilidadeSchema>;

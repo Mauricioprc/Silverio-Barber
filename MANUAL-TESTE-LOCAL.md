@@ -75,6 +75,22 @@ curl -s -b cookies.txt -X PUT http://127.0.0.1:8787/api/barbeiros/1/disponibilid
   ]}'
 ```
 
+### Criar a conta admin (retaguarda — vê/gerencia tudo)
+
+Não é um dos sócios-barbeiros: é uma 3ª conta, sem linha em `barbeiros` (não corta
+cabelo, não aparece no agendamento público). Travada em 1 — mesmo padrão do bootstrap
+de sócio, sem tela própria:
+
+```bash
+curl -s -X POST http://127.0.0.1:8787/api/auth/registrar-admin \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Seu Nome (admin)","telefone":"11999990099","senha":"umaSenhaForte123"}'
+```
+
+Sócio comum (login normal, telefone/senha do `registrar-socio`) só vê os próprios dados
+em Agenda/Financeiro/Clientes/Barbeiros; a conta admin continua vendo/gerenciando tudo
+consolidado, como sempre foi.
+
 ## 3. Testar o painel do sócio (Fase 1)
 
 1. Abra `http://localhost:5173/login`.

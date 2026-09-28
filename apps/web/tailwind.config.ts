@@ -15,8 +15,10 @@ export default {
           100: "#f4f4f5", // fundo da página (cinza claro, atrás dos cards)
           300: "#6b7280", // texto secundário/muted sobre superfícies claras
           500: "#d4d4d8", // bordas/divisores neutros
+          600: "#242424", // borda sutil sobre superfície escura (telas dark, ex.: Barbeiros)
           700: "#ffffff", // superfície (cards, inputs, modais)
-          900: "#0a0a0a", // chrome preto (header, botão primário, trilho do menu)
+          800: "#171717", // superfície elevada sobre fundo escuro (cards em telas dark)
+          900: "#0a0a0a", // chrome preto (header, botão primário, trilho do menu) / fundo de telas dark
         },
         destaque: {
           400: "#e3ba5c", // uso apenas sobre fundo escuro (chrome preto)

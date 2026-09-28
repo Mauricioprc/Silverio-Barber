@@ -3,6 +3,8 @@ import type { Db, DbOuTx } from "../../db/client";
 import { agendamentos, barbeiros, clientes, servicos, usuarios } from "../../db/schema";
 import { criarLancamentoSeNecessario, removerLancamentoDeAgendamento } from "../financeiro/financeiro.service";
 import { inserirOcupacao, removerOcupacaoDeAgendamento } from "../../shared/ocupacao/ocupacao.util";
+import { ehDonoOuAdmin } from "../../shared/auth/exigir-dono-ou-admin";
+import type { EscopoAutorizacao } from "../../shared/tipos";
 import type { CriarAgendamentoInput, EditarAgendamentoInput } from "./agendamentos.schema";
 import { inicioDoDiaSeguinte, somarMinutos } from "./data.util";
 
@@ -31,6 +33,13 @@ export class AgendamentoNaoEncontradoError extends Error {
   constructor() {
     super("Agendamento não encontrado.");
     this.name = "AgendamentoNaoEncontradoError";
+  }
+}
+
+export class AcessoNegadoError extends Error {
+  constructor() {
+    super("Você só pode acessar seus próprios dados.");
+    this.name = "AcessoNegadoError";
   }
 }
 
@@ -170,9 +179,18 @@ async function buscarAgendamento(db: DbOuTx, id: number) {
  * outro → `concluido` de novo simplesmente cria um novo lançamento (o antigo já foi
  * removido na transição de saída) — sem duplicar, graças à constraint `unique()`.
  */
-export async function editarAgendamento(db: Db, id: number, dados: EditarAgendamentoInput) {
+export async function editarAgendamento(db: Db, id: number, dados: EditarAgendamentoInput, escopo: EscopoAutorizacao) {
   return db.transaction(async (tx) => {
     const atual = await buscarAgendamento(tx, id);
+
+    if (!ehDonoOuAdmin(escopo, atual.barbeiroId)) {
+      throw new AcessoNegadoError();
+    }
+    // Reatribuir agendamento pra outro barbeiro é ação exclusiva de admin — não-admin só
+    // mexe no que já é dele, e não pode "doar" o horário pro colega por aqui.
+    if (dados.barbeiroId !== undefined && !escopo.admin && dados.barbeiroId !== atual.barbeiroId) {
+      throw new AcessoNegadoError();
+    }
 
     let barbeiroId = atual.barbeiroId;
     if (dados.barbeiroId !== undefined) {
@@ -239,6 +257,7 @@ function diferencaEmMinutos(inicio: string, fim: string): number {
 export async function obterDadosParaMensagem(db: Db, id: number) {
   const [linha] = await db
     .select({
+      barbeiroId: agendamentos.barbeiroId,
       nomeCliente: agendamentos.nomeCliente,
       telefoneCliente: agendamentos.telefoneCliente,
       inicio: agendamentos.inicio,

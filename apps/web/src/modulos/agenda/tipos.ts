@@ -1,6 +1,5 @@
 export type { ServicoInterno } from "../servicos/tipos";
-
-export type BarbeiroInterno = { id: number; usuarioId: number; ativo: boolean; nome: string; telefone: string };
+export type { BarbeiroInterno } from "../barbeiros/tipos";
 
 export type StatusAgendamento = "confirmado" | "cancelado" | "concluido";
 

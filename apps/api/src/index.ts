@@ -22,6 +22,7 @@ app.use("*", async (c, next) => {
   c.set("db", db);
   c.set("usuarioId", null);
   c.set("clienteId", null);
+  c.set("escopo", null);
   try {
     await next();
   } finally {
