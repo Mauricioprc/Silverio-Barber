@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { telefoneSchema } from "@silverio/shared";
+import { telefoneSchema, usuarioLoginSchema } from "@silverio/shared";
 
 const senhaSchema = z.string().min(8, "Senha precisa ter pelo menos 8 caracteres.").max(200);
 
 export const registrarSocioSchema = z.object({
   nome: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120),
+  usuario: usuarioLoginSchema,
   telefone: telefoneSchema,
   senha: senhaSchema,
 });
@@ -13,27 +14,28 @@ export const registrarSocioSchema = z.object({
 export const registrarAdminSchema = registrarSocioSchema;
 
 export const loginSchema = z.object({
-  telefone: z.string().trim().min(1, "Telefone é obrigatório."),
+  usuario: z.string().trim().min(1, "Usuário é obrigatório."),
   senha: z.string().min(1, "Senha é obrigatória."),
 });
 
 /**
- * `nome` sozinho não exige senha (baixo risco). Mudar `telefone` — é o login — exige
- * `senhaAtual` pra confirmar; por isso o refine: ou não veio `telefone`, ou veio junto com
- * `senhaAtual`.
+ * `nome` e `telefone` sozinhos não exigem senha (baixo risco, `telefone` é só contato).
+ * Mudar `usuario` — é o login — exige `senhaAtual` pra confirmar; por isso o refine: ou não
+ * veio `usuario`, ou veio junto com `senhaAtual`.
  */
 export const atualizarMeuPerfilSchema = z
   .object({
     nome: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120).optional(),
     telefone: telefoneSchema.optional(),
+    usuario: usuarioLoginSchema.optional(),
     senhaAtual: z.string().min(1).optional(),
   })
-  .refine((dados) => dados.telefone === undefined || dados.senhaAtual !== undefined, {
-    message: "Informe a senha atual para trocar o telefone.",
+  .refine((dados) => dados.usuario === undefined || dados.senhaAtual !== undefined, {
+    message: "Informe a senha atual para trocar o usuário.",
     path: ["senhaAtual"],
   })
-  .refine((dados) => dados.nome !== undefined || dados.telefone !== undefined, {
-    message: "Informe ao menos um campo: nome ou telefone.",
+  .refine((dados) => dados.nome !== undefined || dados.telefone !== undefined || dados.usuario !== undefined, {
+    message: "Informe ao menos um campo: nome, telefone ou usuário.",
   });
 
 export const alterarSenhaSchema = z.object({

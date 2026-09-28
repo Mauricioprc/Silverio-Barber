@@ -22,6 +22,7 @@ export async function listarBarbeiros(db: Db, filtroBarbeiroId?: number) {
       usuarioId: barbeiros.usuarioId,
       ativo: barbeiros.ativo,
       nome: usuarios.nome,
+      usuario: usuarios.usuario,
       telefone: usuarios.telefone,
     })
     .from(barbeiros)
@@ -54,7 +55,14 @@ export async function atualizarBarbeiro(db: Db, barbeiroId: number, dados: { ati
   }
 
   const [barbeiro] = await db
-    .select({ id: barbeiros.id, usuarioId: barbeiros.usuarioId, ativo: barbeiros.ativo, nome: usuarios.nome, telefone: usuarios.telefone })
+    .select({
+      id: barbeiros.id,
+      usuarioId: barbeiros.usuarioId,
+      ativo: barbeiros.ativo,
+      nome: usuarios.nome,
+      usuario: usuarios.usuario,
+      telefone: usuarios.telefone,
+    })
     .from(barbeiros)
     .innerJoin(usuarios, eq(barbeiros.usuarioId, usuarios.id))
     .where(eq(barbeiros.id, barbeiroId))

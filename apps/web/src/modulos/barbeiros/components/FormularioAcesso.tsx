@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { KeyRound, Phone } from "lucide-react";
+import { KeyRound, Phone, User } from "lucide-react";
 import { useToast } from "../../../componentes/Toast";
 import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useAlterarSenha } from "../hooks/useAlterarSenha";
@@ -25,14 +25,21 @@ function CampoSenha({
   );
 }
 
-/** Telefone (login) e senha — sempre a própria conta (`PUT /auth/me` / `PUT /auth/senha`), nunca de outro barbeiro. */
-export function FormularioAcesso({ telefoneAtual }: { telefoneAtual: string }) {
+/**
+ * Usuário (login), telefone (contato) e senha — sempre a própria conta (`PUT /auth/me` /
+ * `PUT /auth/senha`), nunca de outro barbeiro. Trocar usuário exige senha atual (é o
+ * login); telefone é só contato, não exige.
+ */
+export function FormularioAcesso({ usuarioAtual, telefoneAtual }: { usuarioAtual: string; telefoneAtual: string }) {
   const { mostrarToast } = useToast();
   const atualizarPerfil = useAtualizarPerfil();
   const alterarSenha = useAlterarSenha();
 
+  const [usuario, setUsuario] = useState(usuarioAtual);
+  const [senhaAtualUsuario, setSenhaAtualUsuario] = useState("");
+  const [erroUsuario, setErroUsuario] = useState<string | null>(null);
+
   const [telefone, setTelefone] = useState(telefoneAtual);
-  const [senhaAtualTelefone, setSenhaAtualTelefone] = useState("");
   const [erroTelefone, setErroTelefone] = useState<string | null>(null);
 
   const [senhaAtual, setSenhaAtual] = useState("");
@@ -40,15 +47,26 @@ export function FormularioAcesso({ telefoneAtual }: { telefoneAtual: string }) {
   const [senhaConfirmar, setSenhaConfirmar] = useState("");
   const [erroSenha, setErroSenha] = useState<string | null>(null);
 
+  function aoSalvarUsuario() {
+    setErroUsuario(null);
+    atualizarPerfil.mutate(
+      { usuario, senhaAtual: senhaAtualUsuario },
+      {
+        onSuccess: () => {
+          mostrarToast("Usuário atualizado. Outras sessões abertas foram encerradas.");
+          setSenhaAtualUsuario("");
+        },
+        onError: (erro) => setErroUsuario(mensagemHumana(erro)),
+      }
+    );
+  }
+
   function aoSalvarTelefone() {
     setErroTelefone(null);
     atualizarPerfil.mutate(
-      { telefone, senhaAtual: senhaAtualTelefone },
+      { telefone },
       {
-        onSuccess: () => {
-          mostrarToast("Telefone atualizado. Outras sessões abertas foram encerradas.");
-          setSenhaAtualTelefone("");
-        },
+        onSuccess: () => mostrarToast("Telefone atualizado."),
         onError: (erro) => setErroTelefone(mensagemHumana(erro)),
       }
     );
@@ -78,19 +96,40 @@ export function FormularioAcesso({ telefoneAtual }: { telefoneAtual: string }) {
     <div className="flex flex-col gap-6">
       <div>
         <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-white/40">
+          <User className="h-3.5 w-3.5" aria-hidden="true" />
+          Usuário de acesso
+        </p>
+        <div className="flex flex-col gap-2 rounded-lg border border-base-600 bg-base-800 p-4">
+          <label className="flex flex-col gap-1 text-sm text-white/60">
+            Usuário
+            <input type="text" value={usuario} onChange={(e) => setUsuario(e.target.value)} className={classeCampo} />
+          </label>
+          <CampoSenha rotulo="Senha atual (pra confirmar)" valor={senhaAtualUsuario} onChange={setSenhaAtualUsuario} />
+          {erroUsuario && <p className="text-sm text-red-400">{erroUsuario}</p>}
+          <button
+            onClick={aoSalvarUsuario}
+            disabled={atualizarPerfil.isPending || usuario === usuarioAtual || !senhaAtualUsuario}
+            className="self-start rounded border border-base-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:border-destaque-500 disabled:opacity-40"
+          >
+            {atualizarPerfil.isPending ? "Salvando…" : "Salvar usuário"}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-white/40">
           <Phone className="h-3.5 w-3.5" aria-hidden="true" />
-          Telefone de acesso
+          Telefone de contato
         </p>
         <div className="flex flex-col gap-2 rounded-lg border border-base-600 bg-base-800 p-4">
           <label className="flex flex-col gap-1 text-sm text-white/60">
             Telefone
             <input type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} className={classeCampo} />
           </label>
-          <CampoSenha rotulo="Senha atual (pra confirmar)" valor={senhaAtualTelefone} onChange={setSenhaAtualTelefone} />
           {erroTelefone && <p className="text-sm text-red-400">{erroTelefone}</p>}
           <button
             onClick={aoSalvarTelefone}
-            disabled={atualizarPerfil.isPending || telefone === telefoneAtual || !senhaAtualTelefone}
+            disabled={atualizarPerfil.isPending || telefone === telefoneAtual}
             className="self-start rounded border border-base-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:border-destaque-500 disabled:opacity-40"
           >
             {atualizarPerfil.isPending ? "Salvando…" : "Salvar telefone"}

@@ -2,12 +2,12 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "../lib/api-client";
 
-type Socio = { id: number; nome: string; telefone: string; admin: boolean };
+type Socio = { id: number; nome: string; usuario: string; telefone: string; admin: boolean };
 
 type AuthSocioContextValor = {
   socio: Socio | null;
   carregando: boolean;
-  login: (telefone: string, senha: string) => Promise<void>;
+  login: (usuario: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -44,8 +44,8 @@ export function AuthSocioProvider({ children }: { children: ReactNode }) {
   });
 
   const login = useCallback(
-    async (telefone: string, senha: string) => {
-      await apiFetch("/auth/login", { method: "POST", corpo: { telefone, senha } });
+    async (usuario: string, senha: string) => {
+      await apiFetch("/auth/login", { method: "POST", corpo: { usuario, senha } });
       await queryClient.invalidateQueries({ queryKey: CHAVE_QUERY_EU });
     },
     [queryClient]

@@ -12,7 +12,7 @@ export default function LoginSocioPage() {
   const { login } = useAuthSocio();
   const navigate = useNavigate();
   const { mostrarToast } = useToast();
-  const [telefone, setTelefone] = useState("");
+  const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -33,13 +33,13 @@ export default function LoginSocioPage() {
     setErro(null);
     setEnviando(true);
     try {
-      await login(telefone, senha);
+      await login(usuario, senha);
       navigate("/painel", { replace: true });
     } catch (erroCapturado) {
       // 401 aqui é credencial errada, não sessão expirada — `mensagemHumana` mapeia
       // 401 genericamente para "sua sessão expirou", que não faz sentido numa tentativa
       // de login (não havia sessão ainda). O back-end já devolve a mensagem certa
-      // ("Telefone ou senha inválidos.", regra 3 do documento de convenções: não
+      // ("Usuário ou senha inválidos.", regra 3 do documento de convenções: não
       // diferenciar usuário inexistente de senha errada) — usar ela direto só neste caso.
       const mensagem =
         erroCapturado instanceof ApiError && erroCapturado.status === 401
@@ -58,10 +58,11 @@ export default function LoginSocioPage() {
         <h1 className="mb-4 text-xl font-semibold">Entrar</h1>
         <form onSubmit={aoEnviar} className="flex flex-col gap-4">
           <Input
-            rotulo="Telefone"
-            type="tel"
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
+            rotulo="Usuário"
+            type="text"
+            autoComplete="username"
+            value={usuario}
+            onChange={(e) => setUsuario(e.target.value)}
             required
           />
           <Input

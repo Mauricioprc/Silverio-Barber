@@ -18,6 +18,8 @@ import {
 export const usuarios = pgTable("usuarios", {
   id: serial("id").primaryKey(),
   nome: text("nome").notNull(),
+  /** Login do staff — separado de `telefone`, que é só dado de contato. */
+  usuario: text("usuario").notNull().unique(),
   telefone: text("telefone").notNull().unique(),
   senhaHash: text("senha_hash").notNull(),
   /**

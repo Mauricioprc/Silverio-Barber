@@ -197,8 +197,8 @@ async function aplicarMigracoes(client) {
 }
 
 async function seed(client) {
-  await client.query(`INSERT INTO usuarios (id, nome, telefone, senha_hash) VALUES (1,'Socio Um','11999990001','hash')`);
-  await client.query(`INSERT INTO usuarios (id, nome, telefone, senha_hash) VALUES (2,'Socio Dois','11999990002','hash')`);
+  await client.query(`INSERT INTO usuarios (id, nome, usuario, telefone, senha_hash) VALUES (1,'Socio Um','socio.um','11999990001','hash')`);
+  await client.query(`INSERT INTO usuarios (id, nome, usuario, telefone, senha_hash) VALUES (2,'Socio Dois','socio.dois','11999990002','hash')`);
   await client.query(`INSERT INTO barbeiros (id, usuario_id, ativo) VALUES (1,1,true)`);
   await client.query(`INSERT INTO barbeiros (id, usuario_id, ativo) VALUES (2,2,true)`);
   await client.query(`INSERT INTO servicos (id, nome, valor_centavos, duracao_minutos) VALUES (1,'Corte',5000,30)`);

@@ -32,7 +32,7 @@ só se faz chamando a API diretamente. Rode uma vez (com a API no ar):
 ```bash
 curl -s -X POST http://127.0.0.1:8787/api/auth/registrar-socio \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Seu Nome","telefone":"11999990000","senha":"umaSenhaForte123"}'
+  -d '{"nome":"Seu Nome","usuario":"seu.nome","telefone":"11999990000","senha":"umaSenhaForte123"}'
 ```
 
 Guarde o `Set-Cookie` da resposta de login ou repita o login para pegar um cookie de
@@ -41,7 +41,7 @@ sessão (mais simples: use `--cookie-jar cookies.txt` no login e reaproveite):
 ```bash
 curl -s -c cookies.txt -X POST http://127.0.0.1:8787/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"telefone":"11999990000","senha":"umaSenhaForte123"}'
+  -d '{"usuario":"seu.nome","senha":"umaSenhaForte123"}'
 ```
 
 Criar um serviço (valor em **centavos**):
@@ -84,10 +84,10 @@ de sócio, sem tela própria:
 ```bash
 curl -s -X POST http://127.0.0.1:8787/api/auth/registrar-admin \
   -H "Content-Type: application/json" \
-  -d '{"nome":"Seu Nome (admin)","telefone":"11999990099","senha":"umaSenhaForte123"}'
+  -d '{"nome":"Seu Nome (admin)","usuario":"admin","telefone":"11999990099","senha":"umaSenhaForte123"}'
 ```
 
-Sócio comum (login normal, telefone/senha do `registrar-socio`) só vê os próprios dados
+Sócio comum (login normal, usuário/senha do `registrar-socio`) só vê os próprios dados
 em Agenda/Financeiro/Clientes/Barbeiros; a conta admin continua vendo/gerenciando tudo
 consolidado, como sempre foi.
 

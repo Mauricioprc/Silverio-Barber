@@ -154,7 +154,7 @@ export function PerfilBarbeiro({ barbeiro, modo, onVoltar }: Props) {
 
       <EditorDisponibilidade barbeiroId={barbeiro.id} />
 
-      {modo === "proprio" && <FormularioAcesso telefoneAtual={barbeiro.telefone} />}
+      {modo === "proprio" && <FormularioAcesso usuarioAtual={barbeiro.usuario} telefoneAtual={barbeiro.telefone} />}
     </div>
   );
 }
