@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { queryClient } from "./lib/query-client";
 import { AuthSocioProvider } from "./contextos/auth-socio-context";
 import { AuthClienteProvider } from "./contextos/auth-cliente-context";
@@ -10,11 +10,11 @@ import { RotaProtegidaSocio } from "./modulos/auth-socio/RotaProtegidaSocio";
 
 // Code-splitting por área: quem só acessa a página pública de agendamento nunca baixa o
 // bundle do painel interno (ver documento de convenções).
-const PaginaPublicaInicial = lazy(() => import("./rotas/publico/PaginaPublicaInicial"));
 const AgendamentoPublicoPage = lazy(() => import("./modulos/agendamento-publico/AgendamentoPublicoPage"));
 const LoginSocioPage = lazy(() => import("./modulos/auth-socio/LoginSocioPage"));
 const PainelLayout = lazy(() => import("./modulos/painel/PainelLayout"));
 const AgendaPage = lazy(() => import("./modulos/agenda/AgendaPage"));
+const BarbeirosPage = lazy(() => import("./modulos/barbeiros/BarbeirosPage"));
 const FinanceiroPage = lazy(() => import("./modulos/financeiro/FinanceiroPage"));
 const ClientesPage = lazy(() => import("./modulos/clientes/ClientesPage"));
 const ServicosPage = lazy(() => import("./modulos/servicos/ServicosPage"));
@@ -36,12 +36,17 @@ export default function App() {
             <BrowserRouter>
               <Suspense fallback={<CarregandoRota />}>
                 <Routes>
-                  <Route path="/" element={<PaginaPublicaInicial />} />
-                  <Route path="/agendar" element={<AgendamentoPublicoPage />} />
-                  <Route path="/login" element={<LoginSocioPage />} />
+                  {/* "/" é um redirecionamento temporário — no futuro uma landing estática
+                      (fora desta SPA) ocupa esse caminho, por isso não criamos página aqui. */}
+                  <Route path="/" element={<Navigate to="/agendar" replace />} />
+                  <Route path="/agendar/*" element={<AgendamentoPublicoPage />} />
+                  {/* Rota antiga do login de sócio — mantém redirect pra quem tiver o link salvo. */}
+                  <Route path="/login" element={<Navigate to="/painel/login" replace />} />
+                  <Route path="/painel/login" element={<LoginSocioPage />} />
                   <Route element={<RotaProtegidaSocio />}>
                     <Route path="/painel" element={<PainelLayout />}>
                       <Route index element={<AgendaPage />} />
+                      <Route path="barbeiros" element={<BarbeirosPage />} />
                       <Route path="financeiro" element={<FinanceiroPage />} />
                       <Route path="clientes" element={<ClientesPage />} />
                       <Route path="servicos" element={<ServicosPage />} />

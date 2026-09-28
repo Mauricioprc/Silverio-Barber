@@ -18,7 +18,7 @@ export function RotaProtegidaSocio() {
   }
 
   if (!socio) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/painel/login" replace />;
   }
 
   return <Outlet />;

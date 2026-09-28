@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthSocio } from "../../contextos/auth-socio-context";
 import { mensagemHumana } from "../../lib/mensagens-erro";
@@ -16,6 +16,17 @@ export default function LoginSocioPage() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+
+  // /painel/login não deve ser indexado — evita anunciar a existência da área de sócio.
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex";
+    document.head.appendChild(meta);
+    return () => {
+      document.head.removeChild(meta);
+    };
+  }, []);
 
   async function aoEnviar(evento: FormEvent) {
     evento.preventDefault();
