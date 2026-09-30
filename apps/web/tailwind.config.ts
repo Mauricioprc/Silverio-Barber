@@ -25,6 +25,23 @@ export default {
           500: "#c9982e", // preenchimento de acento (pílula ativa, ring de foco)
           600: "#a67a1e", // texto dourado sobre fundo claro (contraste)
         },
+        // Redesenho "claro, quente e sofisticado" (ver front-redesign-fase0-agenda.md).
+        // Tokens novos, aditivos — não removem os acima, usados pelas telas fora do
+        // escopo do redesenho (Barbeiros, Serviços, Clientes, Financeiro, Bloqueios)
+        // até elas ganharem seu próprio prompt de redesign.
+        bg: "#F6F4EF",
+        surface: "#FFFFFF",
+        "surface-2": "#F0EDE6",
+        border: "#E4DFD5",
+        text: "#171512",
+        "text-muted": "#6B655A",
+        gold: "#C8963E",
+        "gold-strong": "#8A6420",
+        "gold-soft": "#F7ECD4",
+        "on-gold": "#1A1206",
+        success: "#2E7D55",
+        warning: "#9A6A10",
+        danger: "#C0392B",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
@@ -35,10 +52,13 @@ export default {
         DEFAULT: "0.625rem",
         lg: "1rem",
         xl: "1.25rem",
+        chip: "999px",
+        sheet: "20px",
       },
       boxShadow: {
         card: "0 1px 2px rgba(0,0,0,0.04), 0 8px 20px -12px rgba(0,0,0,0.15)",
         premium: "0 24px 60px -16px rgba(0,0,0,0.35)",
+        soft: "0 1px 2px rgb(23 21 18 / 0.06), 0 4px 16px rgb(23 21 18 / 0.06)",
       },
     },
   },

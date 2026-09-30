@@ -1,9 +1,22 @@
+@import "@fontsource-variable/inter";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
   @apply bg-base-100 text-base-50 font-sans antialiased;
+}
+
+/* Redesenho claro (ver front-redesign-fase0-agenda.md): neutraliza o preenchimento
+   azul do autofill do Chrome nos campos claros do novo design, sem afetar os campos
+   escuros das telas ainda não redesenhadas (que não usam esta classe). */
+.campo-autofill-claro:-webkit-autofill,
+.campo-autofill-claro:-webkit-autofill:hover,
+.campo-autofill-claro:-webkit-autofill:focus {
+  -webkit-text-fill-color: #171512;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Revisão de acessibilidade (Fase 5): respeita a preferência do sistema por menos
