@@ -1,9 +1,10 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { Db, DbOuTx } from "../../db/client";
-import { agendamentos, barbeiros, clientes, servicos, usuarios } from "../../db/schema";
+import { agendamentos, barbeiros, clientes, disponibilidadeBarbeiro, servicos, usuarios } from "../../db/schema";
 import { criarLancamentoSeNecessario, removerLancamentoDeAgendamento } from "../financeiro/financeiro.service";
 import { inserirOcupacao, removerOcupacaoDeAgendamento } from "../../shared/ocupacao/ocupacao.util";
 import { ehDonoOuAdmin } from "../../shared/auth/exigir-dono-ou-admin";
+import { dentroDoExpediente } from "../../shared/disponibilidade/disponibilidade.util";
 import type { EscopoAutorizacao } from "../../shared/tipos";
 import type { CriarAgendamentoInput, EditarAgendamentoInput } from "./agendamentos.schema";
 import { inicioDoDiaSeguinte, somarMinutos } from "./data.util";
@@ -40,6 +41,52 @@ export class AcessoNegadoError extends Error {
   constructor() {
     super("Você só pode acessar seus próprios dados.");
     this.name = "AcessoNegadoError";
+  }
+}
+
+/**
+ * Lançado quando o horário pedido cai fora do expediente do dia (ou dentro da pausa de
+ * almoço) — Fase D do redesenho. Distinto de `ConflitoHorarioError` (409, colisão com
+ * outro agendamento/bloqueio já existente): este é 400, "esse horário nunca esteve
+ * disponível pra começo", não "esse horário acabou de ser tomado".
+ */
+export class ForaDaDisponibilidadeError extends Error {
+  constructor() {
+    super("Esse horário está fora do expediente ou dentro da pausa de almoço do barbeiro.");
+    this.name = "ForaDaDisponibilidadeError";
+  }
+}
+
+/**
+ * Público sempre valida (nunca pode "encaixar" por fora do expediente/pausa); o balcão
+ * só pula esta checagem quando `ignorarDisponibilidade: true` vier explícito no corpo
+ * (schema de balcão only — `agendamentos.schema.ts`), depois de o sócio confirmar o
+ * encaixe no front. Sem disponibilidade cadastrada pro dia = dia de folga = fora do
+ * expediente.
+ */
+async function validarDentroDaDisponibilidade(
+  db: DbOuTx,
+  barbeiroId: number,
+  inicio: string,
+  fim: string,
+  ignorar: boolean | undefined
+) {
+  if (ignorar) return;
+
+  const diaSemana = new Date(`${inicio.slice(0, 10)}T00:00:00Z`).getUTCDay();
+  const [janela] = await db
+    .select({
+      horaInicio: disponibilidadeBarbeiro.horaInicio,
+      horaFim: disponibilidadeBarbeiro.horaFim,
+      pausaInicio: disponibilidadeBarbeiro.pausaInicio,
+      pausaFim: disponibilidadeBarbeiro.pausaFim,
+    })
+    .from(disponibilidadeBarbeiro)
+    .where(and(eq(disponibilidadeBarbeiro.barbeiroId, barbeiroId), eq(disponibilidadeBarbeiro.diaSemana, diaSemana)))
+    .limit(1);
+
+  if (!janela || !dentroDoExpediente(janela, inicio.slice(11, 19), fim.slice(11, 19))) {
+    throw new ForaDaDisponibilidadeError();
   }
 }
 
@@ -118,6 +165,8 @@ export async function criarAgendamento(
 
   const inicio = dados.inicio.length === 16 ? `${dados.inicio}:00` : dados.inicio;
   const fim = somarMinutos(inicio, servico.duracaoMinutos);
+
+  await validarDentroDaDisponibilidade(db, dados.barbeiroId, inicio, fim, dados.ignorarDisponibilidade);
 
   return db.transaction(async (tx) => {
     const [agendamento] = await tx
@@ -214,6 +263,13 @@ export async function editarAgendamento(db: Db, id: number, dados: EditarAgendam
     }
 
     const novoStatus = dados.status ?? atual.status;
+
+    // Só revalida disponibilidade quando o horário e/ou o barbeiro de fato mudam
+    // (reagendar) — trocar só o `status` de um agendamento já existente não deveria
+    // esbarrar numa pausa criada depois dele.
+    if (dados.barbeiroId !== undefined || dados.inicio !== undefined) {
+      await validarDentroDaDisponibilidade(tx, barbeiroId, inicio, fim, dados.ignorarDisponibilidade);
+    }
 
     const [atualizado] = await tx
       .update(agendamentos)

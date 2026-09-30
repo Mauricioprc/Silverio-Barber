@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, ne } from "drizzle-orm";
 import type { Db } from "../../db/client";
-import { barbeiros, disponibilidadeBarbeiro, usuarios } from "../../db/schema";
+import { agendamentos, barbeiros, disponibilidadeBarbeiro, usuarios } from "../../db/schema";
+import { seSobrepoem } from "../../shared/disponibilidade/disponibilidade.util";
 import type { SubstituirDisponibilidadeInput } from "./barbeiros.schema";
 
 export class BarbeiroNaoEncontradoError extends Error {
@@ -8,6 +9,26 @@ export class BarbeiroNaoEncontradoError extends Error {
     super("Barbeiro não encontrado.");
     this.name = "BarbeiroNaoEncontradoError";
   }
+}
+
+/**
+ * Lançado quando salvar uma pausa nova/editada esbarraria num agendamento futuro já
+ * confirmado (Fase D, item 5 — mesma garantia que Bloqueios já dá hoje: não deixa
+ * silenciosamente criar uma pausa que "engole" um horário já marcado).
+ */
+export class ConflitoComAgendamentoExistenteError extends Error {
+  constructor(public quantidade: number) {
+    super(
+      `${quantidade} agendamento${quantidade > 1 ? "s" : ""} confirmado${quantidade > 1 ? "s" : ""} cairia${quantidade > 1 ? "m" : ""} dentro da nova pausa. Cancele ou reagende antes de salvar.`
+    );
+    this.name = "ConflitoComAgendamentoExistenteError";
+  }
+}
+
+function agoraLocal(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
 /**
@@ -83,9 +104,47 @@ export async function listarDisponibilidade(db: Db, barbeiroId: number) {
       diaSemana: disponibilidadeBarbeiro.diaSemana,
       horaInicio: disponibilidadeBarbeiro.horaInicio,
       horaFim: disponibilidadeBarbeiro.horaFim,
+      pausaInicio: disponibilidadeBarbeiro.pausaInicio,
+      pausaFim: disponibilidadeBarbeiro.pausaFim,
     })
     .from(disponibilidadeBarbeiro)
     .where(eq(disponibilidadeBarbeiro.barbeiroId, barbeiroId));
+}
+
+/**
+ * Barra a gravação se alguma faixa com pausa nova/editada esbarraria num agendamento
+ * futuro não cancelado desse barbeiro (Fase D, item 5) — mesma garantia que Bloqueios já
+ * dá hoje (lá, a exclusion constraint recusa sozinha; aqui a pausa vive em
+ * `disponibilidade_barbeiro`, que não passa por aquela constraint, então a checagem
+ * precisa ser explícita). Só olha agendamentos futuros: o passado não pode mais colidir
+ * com nada.
+ */
+async function validarSemConflitoComAgendamentos(db: Db, barbeiroId: number, dados: SubstituirDisponibilidadeInput) {
+  const faixasComPausa = dados.disponibilidade.filter((f) => f.pausaInicio !== undefined && f.pausaFim !== undefined);
+  if (faixasComPausa.length === 0) return;
+
+  const futuros = await db
+    .select({ inicio: agendamentos.inicio, fim: agendamentos.fim })
+    .from(agendamentos)
+    .where(and(eq(agendamentos.barbeiroId, barbeiroId), gte(agendamentos.inicio, agoraLocal()), ne(agendamentos.status, "cancelado")));
+
+  let conflitos = 0;
+  for (const agendamento of futuros) {
+    const dataAgendamento = agendamento.inicio.slice(0, 10);
+    const diaSemana = new Date(`${dataAgendamento}T00:00:00Z`).getUTCDay();
+    const faixa = faixasComPausa.find((f) => f.diaSemana === diaSemana);
+    if (!faixa) continue;
+
+    const horaInicioAgendamento = agendamento.inicio.slice(11, 19);
+    const horaFimAgendamento = agendamento.fim.slice(11, 19);
+    if (seSobrepoem(horaInicioAgendamento, horaFimAgendamento, faixa.pausaInicio!, faixa.pausaFim!)) {
+      conflitos += 1;
+    }
+  }
+
+  if (conflitos > 0) {
+    throw new ConflitoComAgendamentoExistenteError(conflitos);
+  }
 }
 
 /**
@@ -97,6 +156,8 @@ export async function substituirDisponibilidade(db: Db, barbeiroId: number, dado
   if (!(await existeBarbeiro(db, barbeiroId))) {
     throw new BarbeiroNaoEncontradoError();
   }
+
+  await validarSemConflitoComAgendamentos(db, barbeiroId, dados);
 
   return db.transaction(async (tx) => {
     await tx.delete(disponibilidadeBarbeiro).where(eq(disponibilidadeBarbeiro.barbeiroId, barbeiroId));
@@ -113,6 +174,8 @@ export async function substituirDisponibilidade(db: Db, barbeiroId: number, dado
           diaSemana: faixa.diaSemana,
           horaInicio: faixa.horaInicio,
           horaFim: faixa.horaFim,
+          pausaInicio: faixa.pausaInicio ?? null,
+          pausaFim: faixa.pausaFim ?? null,
         }))
       )
       .returning();

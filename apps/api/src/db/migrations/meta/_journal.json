@@ -57,6 +57,13 @@
       "when": 1790624521209,
       "tag": "0007_clean_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790787821104,
+      "tag": "0008_daffy_aaron_stack",
+      "breakpoints": true
     }
   ]
 }

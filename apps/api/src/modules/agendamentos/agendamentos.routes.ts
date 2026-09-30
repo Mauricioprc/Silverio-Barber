@@ -10,6 +10,7 @@ import {
   AgendamentoNaoEncontradoError,
   BarbeiroInvalidoError,
   ClienteInvalidoError,
+  ForaDaDisponibilidadeError,
   ServicoInvalidoError,
   criarAgendamento,
   editarAgendamento,
@@ -59,7 +60,12 @@ agendamentosRoutes.post("/", async (c) => {
     });
     return c.json({ agendamento }, 201);
   } catch (erro) {
-    if (erro instanceof BarbeiroInvalidoError || erro instanceof ServicoInvalidoError || erro instanceof ClienteInvalidoError) {
+    if (
+      erro instanceof BarbeiroInvalidoError ||
+      erro instanceof ServicoInvalidoError ||
+      erro instanceof ClienteInvalidoError ||
+      erro instanceof ForaDaDisponibilidadeError
+    ) {
       return c.json({ erro: erro.message }, 400);
     }
     if (erro instanceof ConflitoHorarioError) {
@@ -88,7 +94,7 @@ agendamentosRoutes.put("/:id", async (c) => {
     if (erro instanceof AcessoNegadoError) {
       return c.json({ erro: ERRO_ACESSO_NEGADO }, 403);
     }
-    if (erro instanceof BarbeiroInvalidoError) {
+    if (erro instanceof BarbeiroInvalidoError || erro instanceof ForaDaDisponibilidadeError) {
       return c.json({ erro: erro.message }, 400);
     }
     if (erro instanceof ConflitoHorarioError) {

@@ -45,7 +45,12 @@ export async function calcularDisponibilidade(db: Db, barbeiroId: number, data: 
   const diaSemana = new Date(`${data}T00:00:00Z`).getUTCDay();
 
   const janelas = await db
-    .select({ horaInicio: disponibilidadeBarbeiro.horaInicio, horaFim: disponibilidadeBarbeiro.horaFim })
+    .select({
+      horaInicio: disponibilidadeBarbeiro.horaInicio,
+      horaFim: disponibilidadeBarbeiro.horaFim,
+      pausaInicio: disponibilidadeBarbeiro.pausaInicio,
+      pausaFim: disponibilidadeBarbeiro.pausaFim,
+    })
     .from(disponibilidadeBarbeiro)
     .where(and(eq(disponibilidadeBarbeiro.barbeiroId, barbeiroId), eq(disponibilidadeBarbeiro.diaSemana, diaSemana)));
 
@@ -65,9 +70,18 @@ export async function calcularDisponibilidade(db: Db, barbeiroId: number, data: 
       )
     );
 
-  const livres = janelas.flatMap((janela) =>
-    subtrairIntervalos({ inicio: `${data} ${janela.horaInicio}`, fim: `${data} ${janela.horaFim}` }, ocupacoes)
-  );
+  // Pausa de almoço (Fase D) entra como mais um intervalo "ocupado" do dia — mesma
+  // subtração que já é feita pra agendamentos/bloqueios, sem lógica nova.
+  const livres = janelas.flatMap((janela) => {
+    const pausaDoDia =
+      janela.pausaInicio && janela.pausaFim
+        ? [{ inicio: `${data} ${janela.pausaInicio}`, fim: `${data} ${janela.pausaFim}` }]
+        : [];
+    return subtrairIntervalos(
+      { inicio: `${data} ${janela.horaInicio}`, fim: `${data} ${janela.horaFim}` },
+      [...ocupacoes, ...pausaDoDia]
+    );
+  });
 
   return livres.sort((a, b) => a.inicio.localeCompare(b.inicio));
 }

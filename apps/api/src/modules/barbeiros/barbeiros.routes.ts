@@ -6,6 +6,7 @@ import { ERRO_ACESSO_NEGADO, ehDonoOuAdmin } from "../../shared/auth/exigir-dono
 import { atualizarBarbeiroSchema, substituirDisponibilidadeSchema } from "./barbeiros.schema";
 import {
   BarbeiroNaoEncontradoError,
+  ConflitoComAgendamentoExistenteError,
   atualizarBarbeiro,
   listarBarbeiros,
   listarDisponibilidade,
@@ -73,6 +74,9 @@ barbeirosRoutes.put("/:id/disponibilidade", async (c) => {
   } catch (erro) {
     if (erro instanceof BarbeiroNaoEncontradoError) {
       return c.json({ erro: erro.message }, 404);
+    }
+    if (erro instanceof ConflitoComAgendamentoExistenteError) {
+      return c.json({ erro: erro.message }, 409);
     }
     throw erro;
   }

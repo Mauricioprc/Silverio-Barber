@@ -30,6 +30,11 @@ export const criarAgendamentoSchema = z
     nomeCliente: z.string().trim().min(2, "Nome precisa ter pelo menos 2 caracteres.").max(120).optional(),
     telefoneCliente: telefoneSchema.optional(),
     inicio: horarioLocalSchema,
+    // Encaixe do balcão (Fase D do redesenho) — só existe neste schema (balcão), nunca
+    // no canal público (`publico.schema.ts`, `agendamentoPublicoSchema`, que não tem
+    // este campo): o cliente nunca pode marcar dentro do expediente/pausa por conta
+    // própria, só o sócio, com confirmação explícita no front.
+    ignorarDisponibilidade: z.boolean().optional(),
   })
   .refine((dados) => dados.clienteId !== undefined || (dados.nomeCliente !== undefined && dados.telefoneCliente !== undefined), {
     message: "Informe clienteId, ou nomeCliente e telefoneCliente.",
@@ -48,6 +53,7 @@ export const editarAgendamentoSchema = z
     barbeiroId: z.number().int().positive().optional(),
     inicio: horarioLocalSchema.optional(),
     status: statusAgendamentoSchema.optional(),
+    ignorarDisponibilidade: z.boolean().optional(),
   })
   .refine((dados) => dados.barbeiroId !== undefined || dados.inicio !== undefined || dados.status !== undefined, {
     message: "Informe ao menos um campo: barbeiroId, inicio ou status.",

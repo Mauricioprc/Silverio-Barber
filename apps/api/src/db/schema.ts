@@ -56,6 +56,11 @@ export const disponibilidadeBarbeiro = pgTable("disponibilidade_barbeiro", {
   diaSemana: smallint("dia_semana").notNull(),
   horaInicio: time("hora_inicio").notNull(),
   horaFim: time("hora_fim").notNull(),
+  // Pausa de almoço do dia (Fase D do redesenho) — ambos nulos ou ambos preenchidos
+  // (validado no Zod, `barbeiros.schema.ts`), nunca um só. Migração retrocompatível:
+  // toda linha existente já nasce com os dois nulos (sem almoço), sem mudar de sentido.
+  pausaInicio: time("pausa_inicio"),
+  pausaFim: time("pausa_fim"),
 });
 
 /**
