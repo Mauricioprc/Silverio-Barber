@@ -7,6 +7,7 @@ import { Input } from "../../../componentes/Input";
 import { Card } from "../../../componentes/Card";
 import { Skeleton } from "../../../componentes/Skeleton";
 import { EstadoVazio } from "../../../componentes/EstadoVazio";
+import { formatPhoneBR } from "../../../lib/formatPhoneBR";
 import type { Cliente } from "../tipos";
 
 type Props = { clienteId: number | null; onSelecionar: (cliente: Cliente | null) => void };
@@ -28,19 +29,19 @@ export function SeletorCliente({ clienteId, onSelecionar }: Props) {
 
   if (clienteId !== null && clienteExibido) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded border border-base-500 bg-base-700 p-3">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3">
         <div>
-          <p className="font-medium text-base-50">{clienteExibido.nome}</p>
-          <p className="text-sm text-base-300">{clienteExibido.telefone}</p>
+          <p className="font-medium text-text">{clienteExibido.nome}</p>
+          <p className="text-sm text-text-muted">{formatPhoneBR(clienteExibido.telefone)}</p>
         </div>
         <button
           onClick={() => {
             setClienteExibido(null);
             onSelecionar(null);
           }}
-          className="flex items-center gap-1 rounded px-2 py-1 text-sm font-medium text-base-300 transition-colors hover:bg-base-500/30 hover:text-base-50"
+          className="flex h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
         >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
+          <X className="h-4 w-4" aria-hidden="true" />
           Trocar
         </button>
       </div>
@@ -49,7 +50,12 @@ export function SeletorCliente({ clienteId, onSelecionar }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Input rotulo="Buscar cliente por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
+      <Input
+        variante="clara"
+        rotulo="Buscar cliente por nome ou telefone"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+      />
 
       {buscaComDebounce.trim().length > 0 && isLoading && <Skeleton className="h-12 w-full" />}
 
@@ -62,10 +68,10 @@ export function SeletorCliente({ clienteId, onSelecionar }: Props) {
                 setClienteExibido(cliente);
                 onSelecionar(cliente);
               }}
-              className="cursor-pointer p-3 transition-colors hover:border-destaque-500"
+              className="cursor-pointer border-border bg-surface p-3 transition-colors hover:border-gold"
             >
-              <p className="font-medium text-base-50">{cliente.nome}</p>
-              <p className="text-sm text-base-300">{cliente.telefone}</p>
+              <p className="font-medium text-text">{cliente.nome}</p>
+              <p className="text-sm text-text-muted">{formatPhoneBR(cliente.telefone)}</p>
             </Card>
           ))}
         </div>
@@ -78,9 +84,9 @@ export function SeletorCliente({ clienteId, onSelecionar }: Props) {
       <button
         type="button"
         onClick={() => setCadastroAberto(true)}
-        className="flex items-center gap-1.5 self-start rounded px-2 py-1 text-sm font-medium text-destaque-600 transition-colors hover:bg-destaque-500/10"
+        className="flex h-11 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-medium text-gold-strong transition-colors hover:bg-gold-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
       >
-        <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+        <UserPlus className="h-4 w-4" aria-hidden="true" />
         Cliente novo? Cadastrar
       </button>
 
