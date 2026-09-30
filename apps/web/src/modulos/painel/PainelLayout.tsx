@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { CalendarDays, IdCard, LogOut, Scissors, Users, Wallet } from "lucide-react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { CalendarDays, IdCard, LogOut, Menu, Scissors, Users, Wallet } from "lucide-react";
 import { useAuthSocio } from "../../contextos/auth-socio-context";
+import { BarraNavegacao, type ItemNavegacao } from "../../componentes/BarraNavegacao";
 
 const ABAS = [
   { to: "/painel", rotulo: "Agenda", fim: true, Icone: CalendarDays },
@@ -9,6 +10,16 @@ const ABAS = [
   { to: "/painel/clientes", rotulo: "Clientes", fim: false, Icone: Users },
   { to: "/painel/servicos", rotulo: "Serviços", fim: false, Icone: Scissors },
 ];
+
+// Pílula de mobile do redesenho claro (ver front-redesign-fase0-agenda.md): 4 itens
+// (Agenda, Financeiro, Clientes, Mais) — Barbeiros/Serviços/Bloqueios migraram pra
+// dentro de "Mais". A sidebar de desktop (md+) não muda, continua com os 5 itens.
+const ABAS_MOBILE = [
+  { to: "/painel", rotulo: "Agenda", fim: true, Icone: CalendarDays },
+  { to: "/painel/financeiro", rotulo: "Financeiro", fim: false, Icone: Wallet },
+  { to: "/painel/clientes", rotulo: "Clientes", fim: false, Icone: Users },
+];
+const ROTAS_ABA_MAIS = ["/painel/mais", "/painel/barbeiros", "/painel/servicos", "/painel/bloqueios"];
 
 /** Ícone com tooltip que só aparece no hover — usado na sidebar de desktop (`md:` +), onde não há espaço pro rótulo ao lado. */
 function ItemSidebar({ to, fim, rotulo, Icone }: (typeof ABAS)[number]) {
@@ -30,29 +41,28 @@ function ItemSidebar({ to, fim, rotulo, Icone }: (typeof ABAS)[number]) {
   );
 }
 
-/** Item da barra flutuante de mobile — ícone + rótulo sempre visíveis (touch não tem hover pra depender de tooltip). */
-function ItemBarraInferior({ to, fim, rotulo, Icone }: (typeof ABAS)[number]) {
-  return (
-    <NavLink
-      to={to}
-      end={fim}
-      className={({ isActive }) =>
-        `flex flex-1 flex-col items-center gap-0.5 rounded-full py-1.5 text-[11px] font-medium transition-colors ${
-          isActive ? "text-destaque-500" : "text-white/60"
-        }`
-      }
-    >
-      <Icone className="h-5 w-5" aria-hidden="true" />
-      {rotulo}
-    </NavLink>
-  );
-}
-
 export default function PainelLayout() {
   const { socio, logout } = useAuthSocio();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const itensNavMobile: ItemNavegacao[] = [
+    ...ABAS_MOBILE.map((aba) => ({
+      rotulo: aba.rotulo,
+      icone: aba.Icone,
+      ativo: aba.fim ? location.pathname === aba.to : location.pathname.startsWith(aba.to),
+      onClick: () => navigate(aba.to),
+    })),
+    {
+      rotulo: "Mais",
+      icone: Menu,
+      ativo: ROTAS_ABA_MAIS.some((rota) => location.pathname.startsWith(rota)),
+      onClick: () => navigate("/painel/mais"),
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-base-100 md:flex">
+    <div className="min-h-screen bg-bg md:flex">
       {/* Sidebar de ícones — só em telas largas (md+); no celular vira a pílula do header abaixo. */}
       <aside className="hidden shrink-0 flex-col items-center gap-1 bg-base-900 py-4 md:flex md:w-16">
         <span className="mb-4 font-serif text-lg font-semibold text-white" aria-hidden="true">
@@ -79,20 +89,16 @@ export default function PainelLayout() {
       </aside>
 
       <div className="min-w-0 flex-1">
-        {/* Header mobile (< md): só logo + sócio + sair — a navegação principal foi pra barra inferior, mais alcançável com o polegar. */}
-        <header className="sticky top-0 z-30 flex items-center justify-between bg-base-900 p-4 md:hidden">
-          <span className="font-serif text-lg font-semibold tracking-wide text-white">Silvério</span>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-white/50">{socio?.nome}</span>
-            <button
-              onClick={() => logout()}
-              aria-label="Sair"
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/70 transition-colors hover:text-destaque-400"
-            >
-              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-              Sair
-            </button>
-          </div>
+        {/* Topo leve de mobile (< md): wordmark + ícone abrindo "Mais" (Admin/Sair moraram lá). */}
+        <header className="sticky top-0 z-30 flex items-center justify-between bg-bg px-4 md:hidden">
+          <span className="text-lg font-bold tracking-tight text-text">Silvério</span>
+          <button
+            onClick={() => navigate("/painel/mais")}
+            aria-label="Mais"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          >
+            <Menu className="h-5 w-5" aria-hidden="true" />
+          </button>
         </header>
 
         {/* Barra superior de desktop (md+): só o nome do sócio, já que navegação e "Sair" moraram pra sidebar. */}
@@ -105,12 +111,10 @@ export default function PainelLayout() {
           <Outlet />
         </div>
 
-        {/* Barra flutuante de mobile (< md): destacada das bordas, cantos arredondados, sombra — ações principais ao alcance do polegar. */}
-        <nav className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-sm items-center justify-around rounded-full bg-base-900 px-2 py-1.5 shadow-premium md:hidden">
-          {ABAS.map((aba) => (
-            <ItemBarraInferior key={aba.to} {...aba} />
-          ))}
-        </nav>
+        {/* Pílula flutuante clara de mobile (< md), acima da safe area. */}
+        <div className="md:hidden">
+          <BarraNavegacao itens={itensNavMobile} />
+        </div>
       </div>
     </div>
   );
