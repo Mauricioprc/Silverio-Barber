@@ -9,10 +9,14 @@ import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useMetricasComComparacao } from "../hooks/useMetricasComComparacao";
 import { useEditarNomeBarbeiro } from "../hooks/useMutacoesBarbeiro";
 import { useDisponibilidadeBarbeiro } from "../hooks/useDisponibilidadeBarbeiro";
+import { useAusenciasBarbeiro } from "../hooks/useAusencias";
 import { CartaoHorario } from "./CartaoHorario";
 import { SheetHorario } from "./SheetHorario";
+import { CartaoAusencias } from "./CartaoAusencias";
+import { SheetAusencia } from "./SheetAusencia";
 import { FormularioAcesso } from "./FormularioAcesso";
 import type { BarbeiroInterno } from "../tipos";
+import type { Bloqueio } from "../../agenda/tipos";
 
 function formatarReais(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -98,6 +102,10 @@ export function PerfilBarbeiro({ barbeiro, modo }: Props) {
   const { data: disponibilidade, isLoading: carregandoDisponibilidade } = useDisponibilidadeBarbeiro(barbeiro.id);
   const [sheetHorarioAberto, setSheetHorarioAberto] = useState(false);
 
+  const { data: ausencias, isLoading: carregandoAusencias } = useAusenciasBarbeiro(barbeiro.id);
+  const [sheetAusenciaAberto, setSheetAusenciaAberto] = useState(false);
+  const [ausenciaEmEdicao, setAusenciaEmEdicao] = useState<Bloqueio | null>(null);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
@@ -147,6 +155,26 @@ export function PerfilBarbeiro({ barbeiro, modo }: Props) {
           onFechar={() => setSheetHorarioAberto(false)}
         />
       )}
+
+      <CartaoAusencias
+        ausencias={ausencias}
+        isLoading={carregandoAusencias}
+        onAbrirNova={() => {
+          setAusenciaEmEdicao(null);
+          setSheetAusenciaAberto(true);
+        }}
+        onAbrirExistente={(ausencia) => {
+          setAusenciaEmEdicao(ausencia);
+          setSheetAusenciaAberto(true);
+        }}
+      />
+
+      <SheetAusencia
+        barbeiroId={barbeiro.id}
+        aberto={sheetAusenciaAberto}
+        onFechar={() => setSheetAusenciaAberto(false)}
+        ausenciaExistente={ausenciaEmEdicao}
+      />
 
       {modo === "proprio" && <FormularioAcesso usuarioAtual={barbeiro.usuario} telefoneAtual={barbeiro.telefone} />}
     </div>
