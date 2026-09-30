@@ -58,11 +58,11 @@ export function ModalCancelarAgendamento({ agendamento, servicos, barbeiros, onF
             </p>
           </div>
           <p className="text-sm text-danger">Essa ação não pode ser desfeita pelo painel.</p>
-          <div className="flex flex-col gap-2">
-            <Botao variante="contorno-novo" tamanho="lg" onClick={onFechar}>
+          <div className="flex justify-end gap-2">
+            <Botao variante="contorno-novo" tamanho="md" onClick={onFechar}>
               Voltar
             </Botao>
-            <Botao variante="perigo" tamanho="lg" onClick={aoConfirmar} carregando={editar.isPending}>
+            <Botao variante="perigo" tamanho="md" onClick={aoConfirmar} carregando={editar.isPending}>
               Confirmar cancelamento
             </Botao>
           </div>

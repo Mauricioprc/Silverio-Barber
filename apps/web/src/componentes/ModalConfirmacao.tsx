@@ -2,9 +2,9 @@ import { Botao } from "./Botao";
 import { Modal } from "./Modal";
 
 /**
- * Diálogo de confirmação do redesenho claro (ver front-redesign-fase0-agenda.md)
- * para ações destrutivas — botão `perigo` nunca fica ao lado do botão positivo
- * primário, por isso o cancelar vem primeiro e em contorno.
+ * Diálogo de confirmação do redesenho claro (ver front-redesign-fase0-agenda.md) para
+ * ações destrutivas. Botões lado a lado, confirmar à direita (convenção: a ação que o
+ * polegar bate por último, pra não confirmar sem querer ao rolar/tocar rápido).
  */
 export function ModalConfirmacao({
   titulo,
@@ -26,11 +26,11 @@ export function ModalConfirmacao({
   return (
     <Modal titulo={titulo} aberto={aberto} onFechar={onFechar}>
       <p className="mb-6 text-sm text-text-muted">{texto}</p>
-      <div className="flex flex-col gap-2">
-        <Botao variante="contorno-novo" tamanho="lg" onClick={onFechar} disabled={confirmando}>
+      <div className="flex justify-end gap-2">
+        <Botao variante="contorno-novo" tamanho="md" onClick={onFechar} disabled={confirmando}>
           Cancelar
         </Botao>
-        <Botao variante="perigo" tamanho="lg" onClick={onConfirmar} carregando={confirmando}>
+        <Botao variante="perigo" tamanho="md" onClick={onConfirmar} carregando={confirmando}>
           {rotuloConfirmar}
         </Botao>
       </div>
