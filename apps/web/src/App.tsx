@@ -17,6 +17,7 @@ const AgendaPage = lazy(() => import("./modulos/agenda/AgendaPage"));
 const BarbeirosPage = lazy(() => import("./modulos/barbeiros/BarbeirosPage"));
 const FinanceiroPage = lazy(() => import("./modulos/financeiro/FinanceiroPage"));
 const ClientesPage = lazy(() => import("./modulos/clientes/ClientesPage"));
+const ClienteDetalhePage = lazy(() => import("./modulos/clientes/ClienteDetalhePage"));
 const ServicosPage = lazy(() => import("./modulos/servicos/ServicosPage"));
 const BloqueiosPage = lazy(() => import("./modulos/agenda/BloqueiosPage"));
 const MaisPage = lazy(() => import("./modulos/painel/MaisPage"));
@@ -51,6 +52,7 @@ export default function App() {
                       <Route path="barbeiros" element={<BarbeirosPage />} />
                       <Route path="financeiro" element={<FinanceiroPage />} />
                       <Route path="clientes" element={<ClientesPage />} />
+                      <Route path="clientes/:id" element={<ClienteDetalhePage />} />
                       <Route path="servicos" element={<ServicosPage />} />
                       <Route path="bloqueios" element={<BloqueiosPage />} />
                       <Route path="mais" element={<MaisPage />} />

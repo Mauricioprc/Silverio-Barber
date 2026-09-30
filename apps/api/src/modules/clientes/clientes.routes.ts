@@ -13,6 +13,7 @@ import {
   editarCliente,
   listarAgendamentosDoCliente,
   listarClientes,
+  obterClientePorId,
 } from "./clientes.service";
 
 export const clientesRoutes = new Hono<AppContexto>();
@@ -51,6 +52,24 @@ clientesRoutes.post("/", async (c) => {
   } catch (erro) {
     if (erro instanceof TelefoneJaCadastradoError) {
       return c.json({ erro: erro.message }, 409);
+    }
+    throw erro;
+  }
+});
+
+clientesRoutes.get("/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ erro: "Id inválido." }, 400);
+
+  try {
+    const cliente = await obterClientePorId(c.get("db"), id, c.get("escopo")!);
+    return c.json({ cliente });
+  } catch (erro) {
+    if (erro instanceof ClienteNaoEncontradoError) {
+      return c.json({ erro: erro.message }, 404);
+    }
+    if (erro instanceof AcessoNegadoError) {
+      return c.json({ erro: ERRO_ACESSO_NEGADO }, 403);
     }
     throw erro;
   }

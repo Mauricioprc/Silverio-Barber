@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MessageCircle, Plus, Search } from "lucide-react";
 import { useAuthSocio } from "../../contextos/auth-socio-context";
 import { useDebounce } from "../../lib/useDebounce";
@@ -7,7 +8,6 @@ import { linkWhatsapp } from "../../lib/linkWhatsapp";
 import { useClientesInfinito } from "./hooks/useClientesInfinito";
 import { useTotalClientes } from "./hooks/useTotalClientes";
 import { FormularioNovoCliente } from "./components/FormularioNovoCliente";
-import { HistoricoCliente } from "./components/HistoricoCliente";
 import { AvatarClaro } from "../../componentes/AvatarClaro";
 import { Botao } from "../../componentes/Botao";
 import { Card } from "../../componentes/Card";
@@ -39,6 +39,7 @@ function agruparPorLetra(clientes: Cliente[]): { letra: string; itens: Cliente[]
 }
 
 export default function ClientesPage() {
+  const navigate = useNavigate();
   const { socio } = useAuthSocio();
   const [busca, setBusca] = useState("");
   const buscaComDebounce = useDebounce(busca, 250);
@@ -56,7 +57,6 @@ export default function ClientesPage() {
   const { data: total } = useTotalClientes(somenteProprios);
 
   const [novoClienteAberto, setNovoClienteAberto] = useState(false);
-  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
 
   const clientes = data?.pages.flatMap((p) => p.clientes) ?? [];
   const buscando = buscaComDebounce.trim().length > 0;
@@ -116,13 +116,13 @@ export default function ClientesPage() {
                 {grupo.itens.map((cliente) => (
                   <div
                     key={cliente.id}
-                    onClick={() => setClienteSelecionado(cliente)}
+                    onClick={() => navigate(`/painel/clientes/${cliente.id}`)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        setClienteSelecionado(cliente);
+                        navigate(`/painel/clientes/${cliente.id}`);
                       }
                     }}
                     className="flex cursor-pointer items-center gap-3 p-3 transition-colors hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gold"
@@ -156,15 +156,13 @@ export default function ClientesPage() {
         </div>
       )}
 
-      {clienteSelecionado && <HistoricoCliente cliente={clienteSelecionado} />}
-
       <FormularioNovoCliente
         aberto={novoClienteAberto}
         telefoneInicial={buscando ? buscaComDebounce : ""}
         onFechar={() => setNovoClienteAberto(false)}
         onCriado={(cliente) => {
           setNovoClienteAberto(false);
-          setClienteSelecionado(cliente);
+          navigate(`/painel/clientes/${cliente.id}`);
         }}
       />
     </div>

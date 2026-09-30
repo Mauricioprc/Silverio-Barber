@@ -94,6 +94,38 @@ export async function listarClientes(db: Db, paginacao: PaginacaoInput, busca?: 
   return { itens, total: contagem[0]?.total ?? 0 };
 }
 
+/**
+ * Tela de detalhe do cliente (redesenho do front, ver front-redesign-fase2-
+ * financeiro-clientes.md) — não existia leitura de um único cliente até aqui, só a
+ * listagem paginada. Mesma projeção de colunas seguras que `listarClientes` (nunca
+ * `senhaHash`/`senhaHashPendente`). Não-admin só enxerga cliente que já atendeu, mesma
+ * regra de `editarCliente`.
+ */
+export async function obterClientePorId(db: Db, id: number, escopo: EscopoAutorizacao) {
+  if (!escopo.admin) {
+    if (escopo.barbeiroId === null || !(await clienteJaAtendidoPor(db, id, escopo.barbeiroId))) {
+      throw new AcessoNegadoError();
+    }
+  }
+
+  const [cliente] = await db
+    .select({
+      id: clientes.id,
+      nome: clientes.nome,
+      telefone: clientes.telefone,
+      telefoneVerificado: clientes.telefoneVerificado,
+      criadoEm: clientes.criadoEm,
+    })
+    .from(clientes)
+    .where(eq(clientes.id, id))
+    .limit(1);
+
+  if (!cliente) {
+    throw new ClienteNaoEncontradoError();
+  }
+  return cliente;
+}
+
 export async function criarCliente(db: Db, dados: CriarClienteInput) {
   const senhaHash = await gerarHashSenha(dados.senha);
   try {
