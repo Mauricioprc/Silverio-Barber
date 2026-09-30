@@ -158,7 +158,9 @@ export default function ClientesPage() {
 
       <FormularioNovoCliente
         aberto={novoClienteAberto}
-        telefoneInicial={buscando ? buscaComDebounce : ""}
+        // "nome pré-preenchido se o termo tiver letras, ou o telefone se for só números".
+        nomeInicial={buscando && /[a-zà-ÿ]/i.test(buscaComDebounce) ? buscaComDebounce.trim() : ""}
+        telefoneInicial={buscando && !/[a-zà-ÿ]/i.test(buscaComDebounce) ? buscaComDebounce.trim() : ""}
         onFechar={() => setNovoClienteAberto(false)}
         onCriado={(cliente) => {
           setNovoClienteAberto(false);

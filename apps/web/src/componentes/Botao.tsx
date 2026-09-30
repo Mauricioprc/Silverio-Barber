@@ -29,7 +29,7 @@ export function Botao({
     secundaria: "px-4 py-2 text-sm border border-base-500 bg-base-700 text-base-50 hover:border-base-900/30 hover:bg-neutral-50",
     fantasma: "px-4 py-2 text-sm text-base-300 hover:text-base-50",
     dourada:
-      "bg-gold text-on-gold shadow-soft hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold",
+      "bg-gold text-on-gold shadow-soft hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold disabled:bg-surface-2 disabled:text-text-muted disabled:opacity-100 disabled:shadow-none",
     "contorno-novo":
       "border border-border bg-surface text-text hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold",
     "fantasma-novo":
