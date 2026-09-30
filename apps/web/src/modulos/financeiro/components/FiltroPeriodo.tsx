@@ -1,7 +1,10 @@
-import { Select } from "../../../componentes/Select";
+import { Chip } from "../../../componentes/Chip";
+import { Segmentado } from "../../../componentes/Segmentado";
 import type { BarbeiroInterno } from "../../agenda/tipos";
 import type { Periodo } from "../tipos";
 
+// Mesmas opções que já existiam no select (rótulos e valores preservados) — o mockup
+// mostra Hoje/Semana/Mês só como exemplo, isso aqui é o que a tela já tinha.
 const OPCOES: { valor: Periodo; rotulo: string }[] = [
   { valor: "dia", rotulo: "Hoje" },
   { valor: "semana", rotulo: "Últimos 7 dias" },
@@ -17,46 +20,32 @@ type Props = {
 };
 
 export function FiltroPeriodo({ periodo, onMudarPeriodo, barbeiroId, onMudarBarbeiro, barbeiros }: Props) {
-  // Sócio não-admin só enxerga o próprio registro (`GET /barbeiros` já vem escopado do
-  // back-end) — "Todos (consolidado)" seria enganoso aqui, já que o dado mostrado já é só
-  // o dele mesmo. Mostra um rótulo fixo em vez de um seletor sem escolha real.
-  if (barbeiros.length <= 1) {
-    return (
-      <div className="flex flex-wrap items-end gap-3">
-        <Select rotulo="Período" value={periodo} onChange={(e) => onMudarPeriodo(e.target.value as Periodo)}>
-          {OPCOES.map((o) => (
-            <option key={o.valor} value={o.valor}>
-              {o.rotulo}
-            </option>
-          ))}
-        </Select>
-        {barbeiros[0] && <p className="pb-2 text-sm text-base-300">Faturamento de {barbeiros[0].nome}</p>}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-wrap gap-3">
-      <Select rotulo="Período" value={periodo} onChange={(e) => onMudarPeriodo(e.target.value as Periodo)}>
-        {OPCOES.map((o) => (
-          <option key={o.valor} value={o.valor}>
-            {o.rotulo}
-          </option>
-        ))}
-      </Select>
+    <div className="flex flex-col gap-3">
+      <Segmentado
+        rotulo="Período"
+        valor={periodo}
+        onSelecionar={onMudarPeriodo}
+        opcoes={OPCOES.map((o) => ({ valor: o.valor, rotulo: o.rotulo }))}
+      />
 
-      <Select
-        rotulo="Sócio"
-        value={barbeiroId ?? ""}
-        onChange={(e) => onMudarBarbeiro(e.target.value ? Number(e.target.value) : null)}
-      >
-        <option value="">Todos (consolidado)</option>
-        {barbeiros.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.nome}
-          </option>
-        ))}
-      </Select>
+      {/* Sócio não-admin só enxerga o próprio registro (`GET /barbeiros` já vem escopado
+          do back-end) — "Todos" seria enganoso aqui, já que o dado mostrado já é só o
+          dele mesmo. Mostra um rótulo fixo em vez de um filtro sem escolha real. */}
+      {barbeiros.length <= 1 ? (
+        barbeiros[0] && <p className="text-sm text-text-muted">Faturamento de {barbeiros[0].nome}</p>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <Chip ativo={barbeiroId === null} onClick={() => onMudarBarbeiro(null)}>
+            Todos
+          </Chip>
+          {barbeiros.map((b) => (
+            <Chip key={b.id} ativo={b.id === barbeiroId} onClick={() => onMudarBarbeiro(b.id)}>
+              {b.nome}
+            </Chip>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
