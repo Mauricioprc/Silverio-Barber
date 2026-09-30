@@ -43,26 +43,26 @@ export function ModalCancelarAgendamento({ agendamento, servicos, barbeiros, onF
     <Modal titulo="Cancelar agendamento" aberto={agendamento !== null} onFechar={onFechar}>
       {agendamento && (
         <div className="flex flex-col gap-4">
-          <div className="text-sm">
+          <div className="text-sm text-text">
             <p>
-              <span className="text-base-300">Cliente:</span> {agendamento.nomeCliente}
+              <span className="text-text-muted">Cliente:</span> {agendamento.nomeCliente}
             </p>
             <p>
-              <span className="text-base-300">Serviço:</span> {servico?.nome ?? "—"}
+              <span className="text-text-muted">Serviço:</span> {servico?.nome ?? "—"}
             </p>
             <p>
-              <span className="text-base-300">Barbeiro:</span> {barbeiro?.nome ?? "—"}
+              <span className="text-text-muted">Barbeiro:</span> {barbeiro?.nome ?? "—"}
             </p>
             <p>
-              <span className="text-base-300">Quando:</span> {formatarDataHora(agendamento.inicio)}
+              <span className="text-text-muted">Quando:</span> {formatarDataHora(agendamento.inicio)}
             </p>
           </div>
-          <p className="text-sm text-red-400">Essa ação não pode ser desfeita pelo painel.</p>
-          <div className="flex gap-2">
-            <Botao variante="secundaria" onClick={onFechar} className="flex-1">
+          <p className="text-sm text-danger">Essa ação não pode ser desfeita pelo painel.</p>
+          <div className="flex flex-col gap-2">
+            <Botao variante="contorno-novo" tamanho="lg" onClick={onFechar}>
               Voltar
             </Botao>
-            <Botao onClick={aoConfirmar} carregando={editar.isPending} className="flex-1 !bg-red-600 hover:!bg-red-500">
+            <Botao variante="perigo" tamanho="lg" onClick={aoConfirmar} carregando={editar.isPending}>
               Confirmar cancelamento
             </Botao>
           </div>
