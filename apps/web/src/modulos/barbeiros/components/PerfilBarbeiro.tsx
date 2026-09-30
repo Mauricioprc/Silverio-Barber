@@ -8,7 +8,9 @@ import { useToast } from "../../../componentes/Toast";
 import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useMetricasComComparacao } from "../hooks/useMetricasComComparacao";
 import { useEditarNomeBarbeiro } from "../hooks/useMutacoesBarbeiro";
-import { EditorDisponibilidade } from "./EditorDisponibilidade";
+import { useDisponibilidadeBarbeiro } from "../hooks/useDisponibilidadeBarbeiro";
+import { CartaoHorario } from "./CartaoHorario";
+import { SheetHorario } from "./SheetHorario";
 import { FormularioAcesso } from "./FormularioAcesso";
 import type { BarbeiroInterno } from "../tipos";
 
@@ -93,6 +95,8 @@ type Props = { barbeiro: BarbeiroInterno; modo: "proprio" | "admin" };
 
 export function PerfilBarbeiro({ barbeiro, modo }: Props) {
   const { data: metricas, isLoading: carregandoMetricas } = useMetricasComComparacao(barbeiro.id);
+  const { data: disponibilidade, isLoading: carregandoDisponibilidade } = useDisponibilidadeBarbeiro(barbeiro.id);
+  const [sheetHorarioAberto, setSheetHorarioAberto] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -129,7 +133,20 @@ export function PerfilBarbeiro({ barbeiro, modo }: Props) {
         </div>
       </div>
 
-      <EditorDisponibilidade barbeiroId={barbeiro.id} />
+      <CartaoHorario
+        disponibilidade={disponibilidade}
+        isLoading={carregandoDisponibilidade}
+        onAbrir={() => setSheetHorarioAberto(true)}
+      />
+
+      {disponibilidade && (
+        <SheetHorario
+          barbeiroId={barbeiro.id}
+          disponibilidade={disponibilidade}
+          aberto={sheetHorarioAberto}
+          onFechar={() => setSheetHorarioAberto(false)}
+        />
+      )}
 
       {modo === "proprio" && <FormularioAcesso usuarioAtual={barbeiro.usuario} telefoneAtual={barbeiro.telefone} />}
     </div>
