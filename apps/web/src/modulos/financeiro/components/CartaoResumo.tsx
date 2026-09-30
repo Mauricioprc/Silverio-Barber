@@ -1,6 +1,6 @@
 import { Card } from "../../../componentes/Card";
 import { Skeleton } from "../../../componentes/Skeleton";
-import { LinhaComparacao } from "./LinhaComparacao";
+import { LinhaComparacao } from "../../../componentes/LinhaComparacao";
 import { calcularVariacao } from "../periodo.util";
 
 function formatarReais(centavos: number): string {

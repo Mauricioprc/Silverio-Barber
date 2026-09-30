@@ -5,17 +5,6 @@ import type { BarbeiroInterno } from "../tipos";
 /** Prefixo compartilhado com `agenda/hooks/useBarbeirosInternos.ts` — invalidar por aqui atualiza os dois. */
 const CHAVE_QUERY = ["painel", "barbeiros"] as const;
 
-export function useAlternarAtivoBarbeiro() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, ativo }: { id: number; ativo: boolean }) =>
-      apiFetch<{ barbeiro: BarbeiroInterno }>(`/barbeiros/${id}`, { method: "PUT", corpo: { ativo } }).then(
-        (r) => r.barbeiro
-      ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CHAVE_QUERY }),
-  });
-}
-
 /**
  * Edita o nome de exibição — é como o admin renomeia outro barbeiro (a própria conta
  * também pode usar isto, ou `PUT /auth/me`; tanto faz, os dois caem na mesma coluna).

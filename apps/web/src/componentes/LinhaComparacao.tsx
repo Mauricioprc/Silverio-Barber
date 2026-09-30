@@ -1,7 +1,12 @@
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
-import type { Variacao } from "../periodo.util";
+import type { Variacao } from "../lib/periodo";
 
-/** Cor nunca é a única pista (item 6): sempre ícone + sinal + texto junto. */
+/**
+ * Extraído do Financeiro pra ui/ (ver front-redesign-fase3-barbeiros.md, item B2.3) —
+ * o Perfil do Barbeiro reusa exatamente este componente, pra as duas telas nunca
+ * calcularem/mostrarem a comparação de formas diferentes. Cor nunca é a única pista:
+ * sempre ícone + sinal + texto junto.
+ */
 export function LinhaComparacao({ variacao, rotulo, tamanho = "sm" }: { variacao: Variacao; rotulo: string; tamanho?: "sm" | "xs" }) {
   const cor = variacao.direcao === "alta" ? "text-success" : variacao.direcao === "queda" ? "text-danger" : "text-text-muted";
   const Icone = variacao.direcao === "alta" ? TrendingUp : variacao.direcao === "queda" ? TrendingDown : Minus;
