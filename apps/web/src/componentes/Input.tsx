@@ -3,28 +3,55 @@ import { forwardRef, type InputHTMLAttributes } from "react";
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   rotulo: string;
   erro?: string;
+  /**
+   * "clara" pertence ao redesenho claro (ver front-redesign-fase0-agenda.md) —
+   * só deve ser usada nas telas já migradas. "escura" (default) mantém o visual
+   * atual intacto para as telas que ainda não foram redesenhadas.
+   */
+  variante?: "escura" | "clara";
 };
 
-export const Input = forwardRef<HTMLInputElement, Props>(({ rotulo, erro, id, className = "", ...resto }, ref) => {
-  const inputId = id ?? rotulo.toLowerCase().replace(/\s+/g, "-");
+export const Input = forwardRef<HTMLInputElement, Props>(
+  ({ rotulo, erro, id, className = "", variante = "escura", ...resto }, ref) => {
+    const inputId = id ?? rotulo.toLowerCase().replace(/\s+/g, "-");
 
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-sm text-base-300">
-        {rotulo}
-      </label>
-      <input
-        id={inputId}
-        ref={ref}
-        className={`rounded-sm border bg-base-700 px-3 py-2 text-base-50 outline-none transition-colors placeholder:text-base-300/60 focus:border-destaque-500 focus:ring-1 focus:ring-destaque-500 ${
-          erro ? "border-red-500" : "border-base-500"
-        } ${className}`}
-        aria-invalid={Boolean(erro)}
-        {...resto}
-      />
-      {erro && <span className="text-sm text-red-400">{erro}</span>}
-    </div>
-  );
-});
+    if (variante === "clara") {
+      return (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={inputId} className="text-sm text-text-muted">
+            {rotulo}
+          </label>
+          <input
+            id={inputId}
+            ref={ref}
+            className={`campo-autofill-claro h-11 rounded-lg border bg-surface px-3 text-base text-text outline-none transition-colors placeholder:text-text-muted/60 focus:border-gold focus:ring-1 focus:ring-gold ${
+              erro ? "border-danger" : "border-border"
+            } ${className}`}
+            aria-invalid={Boolean(erro)}
+            {...resto}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-1">
+        <label htmlFor={inputId} className="text-sm text-base-300">
+          {rotulo}
+        </label>
+        <input
+          id={inputId}
+          ref={ref}
+          className={`rounded-sm border bg-base-700 px-3 py-2 text-base-50 outline-none transition-colors placeholder:text-base-300/60 focus:border-destaque-500 focus:ring-1 focus:ring-destaque-500 ${
+            erro ? "border-red-500" : "border-base-500"
+          } ${className}`}
+          aria-invalid={Boolean(erro)}
+          {...resto}
+        />
+        {erro && <span className="text-sm text-red-400">{erro}</span>}
+      </div>
+    );
+  },
+);
 
 Input.displayName = "Input";
