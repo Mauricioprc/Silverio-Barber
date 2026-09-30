@@ -19,7 +19,15 @@ export function useDisponibilidadeBarbeiro(barbeiroId: number) {
 export function useSalvarDisponibilidade(barbeiroId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (disponibilidade: { diaSemana: number; horaInicio: string; horaFim: string }[]) =>
+    mutationFn: (
+      disponibilidade: {
+        diaSemana: number;
+        horaInicio: string;
+        horaFim: string;
+        pausaInicio?: string;
+        pausaFim?: string;
+      }[]
+    ) =>
       apiFetch<{ disponibilidade: FaixaDisponibilidade[] }>(`/barbeiros/${barbeiroId}/disponibilidade`, {
         method: "PUT",
         corpo: { disponibilidade },

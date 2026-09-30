@@ -13,7 +13,12 @@ export const DIAS_ORDEM = [
   { valor: 0, abrev: "Dom", nome: "Domingo" },
 ];
 
-export type GrupoDisponibilidade = { diasRotulo: string; horarioRotulo: string };
+export type GrupoDisponibilidade = { diasRotulo: string; horarioRotulo: string; almocoRotulo: string | null };
+
+function rotuloAlmoco(faixa: Pick<FaixaDisponibilidade, "pausaInicio" | "pausaFim"> | null): string | null {
+  if (!faixa?.pausaInicio || !faixa?.pausaFim) return null;
+  return `${faixa.pausaInicio.slice(0, 5)} – ${faixa.pausaFim.slice(0, 5)}`;
+}
 
 function nomesDias(indices: number[]): string {
   const abrevs = indices.map((i) => DIAS_ORDEM[i].abrev);
@@ -38,17 +43,20 @@ function eContiguo(indices: number[]): boolean {
 export function agruparDisponibilidade(faixas: FaixaDisponibilidade[]): GrupoDisponibilidade[] {
   const porDia = DIAS_ORDEM.map((dia) => {
     const faixa = faixas.find((f) => f.diaSemana === dia.valor);
-    return faixa
-      ? {
-          chave: `${faixa.horaInicio.slice(0, 5)}-${faixa.horaFim.slice(0, 5)}`,
-          horario: `${faixa.horaInicio.slice(0, 5)} – ${faixa.horaFim.slice(0, 5)}`,
-        }
-      : { chave: "folga", horario: "Folga" };
+    if (!faixa) return { chave: "folga", horario: "Folga", almoco: null as string | null };
+    // O almoço entra na assinatura do grupo — dois dias com o mesmo expediente mas
+    // almoço diferente não devem virar "Seg a Sex" com um único horário de almoço errado.
+    const almoco = rotuloAlmoco(faixa);
+    return {
+      chave: `${faixa.horaInicio.slice(0, 5)}-${faixa.horaFim.slice(0, 5)}-${almoco ?? ""}`,
+      horario: `${faixa.horaInicio.slice(0, 5)} – ${faixa.horaFim.slice(0, 5)}`,
+      almoco,
+    };
   });
 
-  const buckets = new Map<string, { horario: string; indices: number[] }>();
+  const buckets = new Map<string, { horario: string; almoco: string | null; indices: number[] }>();
   porDia.forEach((info, indice) => {
-    const bucket = buckets.get(info.chave) ?? { horario: info.horario, indices: [] };
+    const bucket = buckets.get(info.chave) ?? { horario: info.horario, almoco: info.almoco, indices: [] };
     bucket.indices.push(indice);
     buckets.set(info.chave, bucket);
   });
@@ -61,12 +69,19 @@ export function agruparDisponibilidade(faixas: FaixaDisponibilidade[]): GrupoDis
           ? `${DIAS_ORDEM[bucket.indices[0]].abrev} a ${DIAS_ORDEM[bucket.indices[bucket.indices.length - 1]].abrev}`
           : nomesDias(bucket.indices),
       horarioRotulo: bucket.horario,
+      almocoRotulo: bucket.almoco,
     }));
 }
 
-/** true se todo dia que trabalha tem exatamente o mesmo horaInicio/horaFim. */
+/** true se todo dia que trabalha tem exatamente o mesmo horaInicio/horaFim/pausa. */
 export function todosMesmoHorario(faixas: FaixaDisponibilidade[]): boolean {
   if (faixas.length <= 1) return true;
   const [primeira, ...resto] = faixas;
-  return resto.every((f) => f.horaInicio === primeira.horaInicio && f.horaFim === primeira.horaFim);
+  return resto.every(
+    (f) =>
+      f.horaInicio === primeira.horaInicio &&
+      f.horaFim === primeira.horaFim &&
+      f.pausaInicio === primeira.pausaInicio &&
+      f.pausaFim === primeira.pausaFim
+  );
 }

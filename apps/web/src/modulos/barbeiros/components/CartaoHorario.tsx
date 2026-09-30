@@ -1,4 +1,4 @@
-import { ChevronRight, Clock } from "lucide-react";
+import { ChevronRight, Clock, Utensils } from "lucide-react";
 import { Card } from "../../../componentes/Card";
 import { Skeleton } from "../../../componentes/Skeleton";
 import { agruparDisponibilidade } from "../disponibilidade.util";
@@ -44,9 +44,17 @@ export function CartaoHorario({
 
       <div className="flex flex-col gap-1">
         {linhas.map((grupo) => (
-          <p key={grupo.diasRotulo} className="text-sm text-text">
-            <span className="font-medium">{grupo.diasRotulo}</span> · {grupo.horarioRotulo}
-          </p>
+          <div key={grupo.diasRotulo}>
+            <p className="text-sm text-text">
+              <span className="font-medium">{grupo.diasRotulo}</span> · {grupo.horarioRotulo}
+            </p>
+            {grupo.almocoRotulo && (
+              <p className="flex items-center gap-1.5 pl-0.5 text-xs text-text-muted">
+                <Utensils className="h-3 w-3 shrink-0" aria-hidden="true" />
+                Almoço · {grupo.almocoRotulo}
+              </p>
+            )}
+          </div>
         ))}
         {variacoesRestantes > 0 && <p className="text-sm text-text-muted">+ {variacoesRestantes} variações</p>}
       </div>
