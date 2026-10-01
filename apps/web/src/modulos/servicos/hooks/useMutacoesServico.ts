@@ -36,3 +36,22 @@ export function useDesativarServico() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CHAVE_QUERY }),
   });
 }
+
+/**
+ * Liga/desliga o vínculo de um barbeiro com um serviço do catálogo (Fase D2) — usado
+ * tanto no sheet de edição de serviço ("Quem faz este serviço") quanto no sheet "Meus
+ * serviços" do próprio barbeiro. Invalida a lista de serviços (os avatares na tela de
+ * Serviços dependem disso) e as duas consultas específicas de vínculo.
+ */
+export function useAlternarVinculoServico() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ barbeiroId, servicoId, ativo }: { barbeiroId: number; servicoId: number; ativo: boolean }) =>
+      apiFetch(`/barbeiros/${barbeiroId}/servicos/${servicoId}`, { method: "PUT", corpo: { ativo } }),
+    onSuccess: (_dados, variaveis) => {
+      queryClient.invalidateQueries({ queryKey: CHAVE_QUERY });
+      queryClient.invalidateQueries({ queryKey: ["painel", "servicos", variaveis.servicoId, "barbeiros"] });
+      queryClient.invalidateQueries({ queryKey: ["painel", "barbeiros", variaveis.barbeiroId, "servicos"] });
+    },
+  });
+}

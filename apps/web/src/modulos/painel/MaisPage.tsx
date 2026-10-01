@@ -1,4 +1,4 @@
-import { CalendarOff, ChevronRight, IdCard, LogOut, Scissors, User, type LucideIcon } from "lucide-react";
+import { ChevronRight, IdCard, LogOut, Scissors, User, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuthSocio } from "../../contextos/auth-socio-context";
 
@@ -27,9 +27,10 @@ function LinhaInfo({ icone: Icone, rotulo }: { icone: LucideIcon; rotulo: string
 
 /**
  * Página "Mais" do redesenho claro (ver front-redesign-fase0-agenda.md) —
- * concentra os acessos que saíram do topo/nav: Barbeiros, Serviços,
- * Bloqueios, e no fim Admin (nome do sócio) + Sair. Lista de links pras
- * rotas já existentes, sem lógica nova.
+ * concentra os acessos que saíram do topo/nav: Barbeiros, Serviços, e no
+ * fim Admin (nome do sócio) + Sair. Lista de links pras rotas já
+ * existentes, sem lógica nova. Bloqueios saiu daqui — o mesmo conceito já
+ * vive em "Ausências" no perfil do barbeiro, sem uma tela paralela.
  */
 export default function MaisPage() {
   const navigate = useNavigate();
@@ -39,7 +40,6 @@ export default function MaisPage() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 p-4">
       <LinhaMais icone={IdCard} rotulo="Barbeiros" onClick={() => navigate("/painel/barbeiros")} />
       <LinhaMais icone={Scissors} rotulo="Serviços" onClick={() => navigate("/painel/servicos")} />
-      <LinhaMais icone={CalendarOff} rotulo="Bloqueios" onClick={() => navigate("/painel/bloqueios")} />
 
       <div className="mt-4 h-px bg-border" aria-hidden="true" />
 

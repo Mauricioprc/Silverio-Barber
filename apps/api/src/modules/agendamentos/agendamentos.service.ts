@@ -1,6 +1,6 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { Db, DbOuTx } from "../../db/client";
-import { agendamentos, barbeiros, clientes, disponibilidadeBarbeiro, servicos, usuarios } from "../../db/schema";
+import { agendamentos, barbeiroServicos, barbeiros, clientes, disponibilidadeBarbeiro, servicos, usuarios } from "../../db/schema";
 import { criarLancamentoSeNecessario, removerLancamentoDeAgendamento } from "../financeiro/financeiro.service";
 import { inserirOcupacao, removerOcupacaoDeAgendamento } from "../../shared/ocupacao/ocupacao.util";
 import { ehDonoOuAdmin } from "../../shared/auth/exigir-dono-ou-admin";
@@ -20,6 +20,14 @@ export class ServicoInvalidoError extends Error {
   constructor() {
     super("Serviço não encontrado ou inativo.");
     this.name = "ServicoInvalidoError";
+  }
+}
+
+/** Fase D do redesenho de Serviços — serviço existe/ativo, mas este barbeiro não faz. */
+export class ServicoNaoAtendidoPeloBarbeiroError extends Error {
+  constructor() {
+    super("Esse barbeiro não atende esse serviço.");
+    this.name = "ServicoNaoAtendidoPeloBarbeiroError";
   }
 }
 
@@ -90,6 +98,28 @@ async function validarDentroDaDisponibilidade(
   }
 }
 
+/**
+ * Fase D do redesenho de Serviços — só aceita criar/reagendar se existir vínculo ativo
+ * barbeiro↔serviço. Checado separado da busca do serviço (que já confirma ativo no
+ * catálogo) porque são dois motivos de recusa diferentes, com mensagens diferentes.
+ */
+async function validarVinculoBarbeiroServico(db: DbOuTx, barbeiroId: number, servicoId: number) {
+  const [vinculo] = await db
+    .select({ id: barbeiroServicos.id })
+    .from(barbeiroServicos)
+    .where(
+      and(
+        eq(barbeiroServicos.barbeiroId, barbeiroId),
+        eq(barbeiroServicos.servicoId, servicoId),
+        eq(barbeiroServicos.ativo, true)
+      )
+    )
+    .limit(1);
+  if (!vinculo) {
+    throw new ServicoNaoAtendidoPeloBarbeiroError();
+  }
+}
+
 export async function listarAgendamentosDoDia(db: Db, barbeiroId: number, data: string) {
   const inicioDia = `${data} 00:00:00`;
   const inicioDiaSeguinte = inicioDoDiaSeguinte(data);
@@ -141,6 +171,8 @@ export async function criarAgendamento(
   if (!servico || !servico.ativo) {
     throw new ServicoInvalidoError();
   }
+
+  await validarVinculoBarbeiroServico(db, dados.barbeiroId, dados.servicoId);
 
   // Se `clienteId` foi informado, nome/telefone vêm do cadastro — nunca do que foi
   // digitado no corpo (evita gravar um nome/telefone desencontrado do cadastro real).
@@ -251,6 +283,10 @@ export async function editarAgendamento(db: Db, id: number, dados: EditarAgendam
       if (!barbeiro || !barbeiro.ativo) {
         throw new BarbeiroInvalidoError();
       }
+      // Reagendar pra outro barbeiro não muda o serviço (não existe esse campo em
+      // `editarAgendamentoSchema`) — só confirma que o novo barbeiro também atende o
+      // serviço que já estava no agendamento.
+      await validarVinculoBarbeiroServico(tx, dados.barbeiroId, atual.servicoId);
       barbeiroId = dados.barbeiroId;
     }
 

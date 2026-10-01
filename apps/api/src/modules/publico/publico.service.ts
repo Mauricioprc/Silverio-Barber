@@ -1,6 +1,6 @@
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq, exists, gt, lt } from "drizzle-orm";
 import type { Db } from "../../db/client";
-import { barbeiros, clientes, disponibilidadeBarbeiro, ocupacoesBarbeiro, servicos, usuarios } from "../../db/schema";
+import { barbeiroServicos, barbeiros, clientes, disponibilidadeBarbeiro, ocupacoesBarbeiro, servicos, usuarios } from "../../db/schema";
 import type { EnviadorWhatsapp } from "../../shared/whatsapp/enviador-whatsapp";
 import { criarAgendamento } from "../agendamentos/agendamentos.service";
 import { inicioDoDiaSeguinte } from "../agendamentos/data.util";
@@ -14,24 +14,66 @@ export class TelefoneNaoVerificadoError extends Error {
   }
 }
 
+/**
+ * Fase D do redesenho de Serviços — só lista serviço com pelo menos 1 barbeiro ativo
+ * vinculado (um serviço sem ninguém pra atender levaria o cliente a um beco sem saída na
+ * próxima etapa, "escolher barbeiro").
+ */
 export async function listarServicosPublicos(db: Db) {
   return db
     .select({ id: servicos.id, nome: servicos.nome, descricao: servicos.descricao, valorCentavos: servicos.valorCentavos, duracaoMinutos: servicos.duracaoMinutos })
     .from(servicos)
-    .where(eq(servicos.ativo, true));
+    .where(
+      and(
+        eq(servicos.ativo, true),
+        exists(
+          db
+            .select({ id: barbeiroServicos.id })
+            .from(barbeiroServicos)
+            .innerJoin(barbeiros, eq(barbeiroServicos.barbeiroId, barbeiros.id))
+            .where(
+              and(
+                eq(barbeiroServicos.servicoId, servicos.id),
+                eq(barbeiroServicos.ativo, true),
+                eq(barbeiros.ativo, true)
+              )
+            )
+        )
+      )
+    );
 }
 
 /**
  * Não expõe telefone do barbeiro (dado de contato interno, sem motivo pra ficar
  * público) — diferente de `barbeiros.service.listarBarbeiros` (uso interno/balcão), que
- * traz nome+telefone do usuário associado.
+ * traz nome+telefone do usuário associado. `servicoId` (Fase D, opcional) restringe aos
+ * barbeiros que atendem aquele serviço — o fluxo público é serviço → barbeiro, então a
+ * etapa de escolher barbeiro já chega sabendo o serviço escolhido antes.
  */
-export async function listarBarbeirosPublicos(db: Db) {
+export async function listarBarbeirosPublicos(db: Db, servicoId?: number) {
   return db
     .select({ id: barbeiros.id, nome: usuarios.nome })
     .from(barbeiros)
     .innerJoin(usuarios, eq(barbeiros.usuarioId, usuarios.id))
-    .where(eq(barbeiros.ativo, true));
+    .where(
+      and(
+        eq(barbeiros.ativo, true),
+        servicoId !== undefined
+          ? exists(
+              db
+                .select({ id: barbeiroServicos.id })
+                .from(barbeiroServicos)
+                .where(
+                  and(
+                    eq(barbeiroServicos.barbeiroId, barbeiros.id),
+                    eq(barbeiroServicos.servicoId, servicoId),
+                    eq(barbeiroServicos.ativo, true)
+                  )
+                )
+            )
+          : undefined
+      )
+    );
 }
 
 /**

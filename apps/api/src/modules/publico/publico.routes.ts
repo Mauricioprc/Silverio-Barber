@@ -4,7 +4,7 @@ import { validarCorpo } from "../../shared/http/validar";
 import { exigirLoginCliente } from "../../shared/middleware/exigir-login-cliente";
 import { criarEnviadorWhatsapp } from "../../shared/whatsapp/enviador-whatsapp";
 import { ConflitoHorarioError } from "../../shared/ocupacao/ocupacao.util";
-import { BarbeiroInvalidoError, ServicoInvalidoError } from "../agendamentos/agendamentos.service";
+import { BarbeiroInvalidoError, ServicoInvalidoError, ServicoNaoAtendidoPeloBarbeiroError } from "../agendamentos/agendamentos.service";
 import { agendamentoPublicoSchema, disponibilidadeQuerySchema } from "./publico.schema";
 import { TelefoneNaoVerificadoError, calcularDisponibilidade, criarAgendamentoPublico, listarBarbeirosPublicos, listarServicosPublicos } from "./publico.service";
 
@@ -20,7 +20,15 @@ publicoRoutes.get("/servicos", async (c) => {
 });
 
 publicoRoutes.get("/barbeiros", async (c) => {
-  const lista = await listarBarbeirosPublicos(c.get("db"));
+  // Fase D do redesenho de Serviços — `servico_id` (opcional, mas o front novo sempre
+  // manda: fluxo é serviço → barbeiro) restringe a quem atende aquele serviço.
+  const servicoIdBruto = c.req.query("servico_id");
+  const servicoId = servicoIdBruto !== undefined ? Number(servicoIdBruto) : undefined;
+  if (servicoId !== undefined && !Number.isInteger(servicoId)) {
+    return c.json({ erro: "servico_id inválido." }, 400);
+  }
+
+  const lista = await listarBarbeirosPublicos(c.get("db"), servicoId);
   return c.json({ barbeiros: lista });
 });
 
@@ -56,7 +64,11 @@ publicoRoutes.post("/agendamentos", exigirLoginCliente, async (c) => {
     if (erro instanceof TelefoneNaoVerificadoError) {
       return c.json({ erro: erro.message, precisaVerificar: true }, 403);
     }
-    if (erro instanceof BarbeiroInvalidoError || erro instanceof ServicoInvalidoError) {
+    if (
+      erro instanceof BarbeiroInvalidoError ||
+      erro instanceof ServicoInvalidoError ||
+      erro instanceof ServicoNaoAtendidoPeloBarbeiroError
+    ) {
       return c.json({ erro: erro.message }, 400);
     }
     if (erro instanceof ConflitoHorarioError) {

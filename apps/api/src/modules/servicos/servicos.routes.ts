@@ -3,7 +3,14 @@ import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
 import { criarServicoSchema, editarServicoSchema } from "./servicos.schema";
-import { ServicoNaoEncontradoError, criarServico, desativarServico, editarServico, listarServicos } from "./servicos.service";
+import {
+  ServicoNaoEncontradoError,
+  criarServico,
+  desativarServico,
+  editarServico,
+  listarBarbeirosDoServico,
+  listarServicos,
+} from "./servicos.service";
 
 export const servicosRoutes = new Hono<AppContexto>();
 
@@ -19,7 +26,7 @@ servicosRoutes.post("/", async (c) => {
   const validacao = await validarCorpo(c, criarServicoSchema);
   if (validacao.dados === null) return validacao.resposta;
 
-  const servico = await criarServico(c.get("db"), validacao.dados);
+  const servico = await criarServico(c.get("db"), validacao.dados, c.get("escopo")!);
   return c.json({ servico }, 201);
 });
 
@@ -39,6 +46,15 @@ servicosRoutes.put("/:id", async (c) => {
     }
     throw erro;
   }
+});
+
+// Fase D do redesenho de Serviços — "quem faz" este serviço.
+servicosRoutes.get("/:id/barbeiros", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ erro: "Id inválido." }, 400);
+
+  const lista = await listarBarbeirosDoServico(c.get("db"), id);
+  return c.json({ barbeiros: lista });
 });
 
 servicosRoutes.delete("/:id", async (c) => {

@@ -10,6 +10,7 @@ import { useToast } from "../../../componentes/Toast";
 import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useCriarAgendamentoBalcao, conflitoDeHorario } from "../hooks/useMutacoesAgendamento";
 import { useHorariosDisponiveis } from "../../agendamento-publico/hooks/useHorariosDisponiveis";
+import { useServicosDoBarbeiro } from "../../barbeiros/hooks/useServicosDoBarbeiro";
 import { SeletorCliente } from "../../clientes/components/SeletorCliente";
 import { hojeISO } from "./SeletorData";
 import type { Cliente } from "../../clientes/tipos";
@@ -77,7 +78,12 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  const servico = servicos.find((s) => s.id === servicoId) ?? null;
+  // Só oferece o serviço se o barbeiro escolhido realmente faz ele (Fase D) — sem isso, a
+  // lista mostrava o catálogo inteiro e o back-end só recusava na hora de confirmar.
+  const { data: servicosDoBarbeiro, isLoading: carregandoServicosDoBarbeiro } = useServicosDoBarbeiro(barbeiroId);
+  const servicosDisponiveis = servicos.filter((s) => servicosDoBarbeiro?.some((sv) => sv.id === s.id && sv.vinculado));
+
+  const servico = servicosDisponiveis.find((s) => s.id === servicoId) ?? null;
   const { data: horarios, isLoading: carregandoHorarios } = useHorariosDisponiveis(
     barbeiroId,
     data,
@@ -86,6 +92,14 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
 
   const criar = useCriarAgendamentoBalcao();
   const { mostrarToast } = useToast();
+
+  // Trocar de barbeiro pode invalidar o serviço já escolhido (ele pode não fazer esse
+  // serviço) — limpa serviço e horário junto, em vez de deixar uma seleção inválida.
+  function aoEscolherBarbeiro(novoBarbeiroId: number) {
+    setBarbeiroId(novoBarbeiroId);
+    setServicoId(null);
+    setHorarioEscolhido(null);
+  }
 
   function reiniciar() {
     setServicoId(null);
@@ -153,13 +167,13 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
             {barbeiros.length <= 3 ? (
               <Segmentado
                 valor={barbeiroId !== null ? String(barbeiroId) : null}
-                onSelecionar={(valor) => setBarbeiroId(Number(valor))}
+                onSelecionar={(valor) => aoEscolherBarbeiro(Number(valor))}
                 opcoes={barbeiros.map((b) => ({ valor: String(b.id), rotulo: b.nome }))}
               />
             ) : (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {barbeiros.map((b) => (
-                  <Chip key={b.id} ativo={b.id === barbeiroId} onClick={() => setBarbeiroId(b.id)}>
+                  <Chip key={b.id} ativo={b.id === barbeiroId} onClick={() => aoEscolherBarbeiro(b.id)}>
                     {b.nome}
                   </Chip>
                 ))}
@@ -170,29 +184,40 @@ export function FormularioAgendamentoBalcao({ aberto, onFechar, barbeiros, servi
 
         <div>
           <p className="mb-2 text-sm font-medium text-text-muted">Serviço</p>
-          <div className="flex flex-col gap-2">
-            {servicos.map((s) => {
-              const selecionado = s.id === servicoId;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    setServicoId(s.id);
-                    setHorarioEscolhido(null);
-                  }}
-                  className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
-                    selecionado ? "border-gold bg-gold-soft" : "border-border bg-surface hover:bg-surface-2"
-                  }`}
-                >
-                  <span className={`font-medium ${selecionado ? "text-gold-strong" : "text-text"}`}>{s.nome}</span>
-                  <span className={`text-sm ${selecionado ? "text-gold-strong" : "text-text-muted"}`}>
-                    {s.duracaoMinutos} min · {formatarReais(s.valorCentavos)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {!barbeiroId ? (
+            <p className="text-sm text-text-muted">Escolha o barbeiro primeiro.</p>
+          ) : carregandoServicosDoBarbeiro ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-[60px] w-full" />
+              <Skeleton className="h-[60px] w-full" />
+            </div>
+          ) : servicosDisponiveis.length === 0 ? (
+            <EstadoVazio titulo={`${barbeiroEscolhido?.nome ?? "Esse barbeiro"} não faz nenhum serviço do catálogo.`} />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {servicosDisponiveis.map((s) => {
+                const selecionado = s.id === servicoId;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setServicoId(s.id);
+                      setHorarioEscolhido(null);
+                    }}
+                    className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold ${
+                      selecionado ? "border-gold bg-gold-soft" : "border-border bg-surface hover:bg-surface-2"
+                    }`}
+                  >
+                    <span className={`font-medium ${selecionado ? "text-gold-strong" : "text-text"}`}>{s.nome}</span>
+                    <span className={`text-sm ${selecionado ? "text-gold-strong" : "text-text-muted"}`}>
+                      {s.duracaoMinutos} min · {formatarReais(s.valorCentavos)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div>

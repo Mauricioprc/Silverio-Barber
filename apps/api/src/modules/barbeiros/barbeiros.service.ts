@@ -1,8 +1,15 @@
 import { and, eq, gte, ne } from "drizzle-orm";
 import type { Db } from "../../db/client";
-import { agendamentos, barbeiros, disponibilidadeBarbeiro, usuarios } from "../../db/schema";
+import { agendamentos, barbeiroServicos, barbeiros, disponibilidadeBarbeiro, servicos, usuarios } from "../../db/schema";
 import { seSobrepoem } from "../../shared/disponibilidade/disponibilidade.util";
-import type { SubstituirDisponibilidadeInput } from "./barbeiros.schema";
+import type { AlternarVinculoServicoInput, SubstituirDisponibilidadeInput } from "./barbeiros.schema";
+
+export class ServicoNaoEncontradoError extends Error {
+  constructor() {
+    super("Serviço não encontrado.");
+    this.name = "ServicoNaoEncontradoError";
+  }
+}
 
 export class BarbeiroNaoEncontradoError extends Error {
   constructor() {
@@ -180,4 +187,70 @@ export async function substituirDisponibilidade(db: Db, barbeiroId: number, dado
       )
       .returning();
   });
+}
+
+/**
+ * Catálogo inteiro de serviços (ativos e inativos — mesma regra de `GET /servicos` sem
+ * `?ativos=1`, pra permitir reativar um vínculo de um serviço que também está desativado
+ * no catálogo) com o vínculo deste barbeiro, se existir (Fase D). `vinculado: false`
+ * tanto pra "nunca teve vínculo" quanto pra "vínculo existe mas está desativado" — do
+ * ponto de vista de quem chama, as duas situações significam a mesma coisa: "não faz".
+ */
+export async function listarServicosDoBarbeiro(db: Db, barbeiroId: number) {
+  if (!(await existeBarbeiro(db, barbeiroId))) {
+    throw new BarbeiroNaoEncontradoError();
+  }
+
+  const linhas = await db
+    .select({
+      id: servicos.id,
+      nome: servicos.nome,
+      valorCentavos: servicos.valorCentavos,
+      duracaoMinutos: servicos.duracaoMinutos,
+      ativoNoCatalogo: servicos.ativo,
+      vinculoAtivo: barbeiroServicos.ativo,
+    })
+    .from(servicos)
+    .leftJoin(barbeiroServicos, and(eq(barbeiroServicos.servicoId, servicos.id), eq(barbeiroServicos.barbeiroId, barbeiroId)));
+
+  return linhas.map((linha) => ({
+    id: linha.id,
+    nome: linha.nome,
+    valorCentavos: linha.valorCentavos,
+    duracaoMinutos: linha.duracaoMinutos,
+    ativoNoCatalogo: linha.ativoNoCatalogo,
+    vinculado: linha.vinculoAtivo === true,
+  }));
+}
+
+/**
+ * Upsert do vínculo (Fase D) — `ON CONFLICT` na constraint única (barbeiroId, servicoId)
+ * criada na migração: primeira vez que o barbeiro mexe num serviço, insere a linha;
+ * depois disso, só alterna `ativo` na linha existente. Nunca apaga a linha (soft delete,
+ * mesma regra 5 do resto do projeto).
+ */
+export async function alternarVinculoServico(
+  db: Db,
+  barbeiroId: number,
+  servicoId: number,
+  dados: AlternarVinculoServicoInput
+) {
+  if (!(await existeBarbeiro(db, barbeiroId))) {
+    throw new BarbeiroNaoEncontradoError();
+  }
+  const [servico] = await db.select({ id: servicos.id }).from(servicos).where(eq(servicos.id, servicoId)).limit(1);
+  if (!servico) {
+    throw new ServicoNaoEncontradoError();
+  }
+
+  const [vinculo] = await db
+    .insert(barbeiroServicos)
+    .values({ barbeiroId, servicoId, ativo: dados.ativo })
+    .onConflictDoUpdate({
+      target: [barbeiroServicos.barbeiroId, barbeiroServicos.servicoId],
+      set: { ativo: dados.ativo },
+    })
+    .returning();
+
+  return vinculo;
 }

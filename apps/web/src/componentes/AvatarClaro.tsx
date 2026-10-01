@@ -6,6 +6,7 @@ function iniciais(nome: string): string {
 }
 
 const TAMANHOS = {
+  xs: "h-7 w-7 text-[10px]", // 28px — pilha de avatares na linha de Serviços (Fase D2)
   md: "h-11 w-11 text-sm", // 44px — Clientes (lista e detalhe)
   lg: "h-12 w-12 text-base", // 48px — lista de Barbeiros
   xl: "h-[72px] w-[72px] text-xl", // 72px — perfil do Barbeiro

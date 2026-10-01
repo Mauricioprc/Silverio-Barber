@@ -3,8 +3,8 @@ import { Skeleton } from "../../../componentes/Skeleton";
 import { EstadoVazio } from "../../../componentes/EstadoVazio";
 import type { Barbeiro } from "../tipos";
 
-export function EtapaBarbeiro({ onEscolher }: { onEscolher: (barbeiro: Barbeiro) => void }) {
-  const { data: barbeiros, isLoading, isError } = useBarbeiros();
+export function EtapaBarbeiro({ servicoId, onEscolher }: { servicoId: number; onEscolher: (barbeiro: Barbeiro) => void }) {
+  const { data: barbeiros, isLoading, isError } = useBarbeiros(servicoId);
 
   if (isLoading) {
     return (

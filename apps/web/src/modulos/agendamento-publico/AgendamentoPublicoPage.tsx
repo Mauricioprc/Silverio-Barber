@@ -49,8 +49,9 @@ export default function AgendamentoPublicoPage() {
         />
       )}
 
-      {etapa === "barbeiro" && (
+      {etapa === "barbeiro" && selecao.servico && (
         <EtapaBarbeiro
+          servicoId={selecao.servico.id}
           onEscolher={(barbeiro) => {
             setSelecao((atual) => ({ ...atual, barbeiro }));
             setEtapa("horario");

@@ -21,7 +21,7 @@ function formatarExibicao(data: string): string {
 
 export function SeletorData({ data, onMudar }: { data: string; onMudar: (data: string) => void }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center justify-center gap-2">
       <button
         onClick={() => onMudar(somarDias(data, -1))}
         aria-label="Dia anterior"

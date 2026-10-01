@@ -3,13 +3,16 @@ import type { AppContexto } from "../../shared/tipos";
 import { validarCorpo } from "../../shared/http/validar";
 import { exigirLogin } from "../../shared/middleware/exigir-login";
 import { ERRO_ACESSO_NEGADO, ehDonoOuAdmin } from "../../shared/auth/exigir-dono-ou-admin";
-import { atualizarBarbeiroSchema, substituirDisponibilidadeSchema } from "./barbeiros.schema";
+import { alternarVinculoServicoSchema, atualizarBarbeiroSchema, substituirDisponibilidadeSchema } from "./barbeiros.schema";
 import {
   BarbeiroNaoEncontradoError,
   ConflitoComAgendamentoExistenteError,
+  ServicoNaoEncontradoError,
+  alternarVinculoServico,
   atualizarBarbeiro,
   listarBarbeiros,
   listarDisponibilidade,
+  listarServicosDoBarbeiro,
   substituirDisponibilidade,
 } from "./barbeiros.service";
 
@@ -77,6 +80,44 @@ barbeirosRoutes.put("/:id/disponibilidade", async (c) => {
     }
     if (erro instanceof ConflitoComAgendamentoExistenteError) {
       return c.json({ erro: erro.message }, 409);
+    }
+    throw erro;
+  }
+});
+
+// Fase D do redesenho de Serviços — catálogo inteiro + vínculo (ativo/inativo) deste
+// barbeiro com cada um, pra montar a tela "Meus serviços".
+barbeirosRoutes.get("/:id/servicos", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ erro: "Id inválido." }, 400);
+  if (!ehDonoOuAdmin(c.get("escopo")!, id)) return c.json({ erro: ERRO_ACESSO_NEGADO }, 403);
+
+  try {
+    const servicos = await listarServicosDoBarbeiro(c.get("db"), id);
+    return c.json({ servicos });
+  } catch (erro) {
+    if (erro instanceof BarbeiroNaoEncontradoError) {
+      return c.json({ erro: erro.message }, 404);
+    }
+    throw erro;
+  }
+});
+
+barbeirosRoutes.put("/:id/servicos/:servicoId", async (c) => {
+  const id = Number(c.req.param("id"));
+  const servicoId = Number(c.req.param("servicoId"));
+  if (!Number.isInteger(id) || !Number.isInteger(servicoId)) return c.json({ erro: "Id inválido." }, 400);
+  if (!ehDonoOuAdmin(c.get("escopo")!, id)) return c.json({ erro: ERRO_ACESSO_NEGADO }, 403);
+
+  const validacao = await validarCorpo(c, alternarVinculoServicoSchema);
+  if (validacao.dados === null) return validacao.resposta;
+
+  try {
+    const vinculo = await alternarVinculoServico(c.get("db"), id, servicoId, validacao.dados);
+    return c.json({ vinculo });
+  } catch (erro) {
+    if (erro instanceof BarbeiroNaoEncontradoError || erro instanceof ServicoNaoEncontradoError) {
+      return c.json({ erro: erro.message }, 404);
     }
     throw erro;
   }

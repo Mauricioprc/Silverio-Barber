@@ -12,14 +12,14 @@ const ABAS = [
 ];
 
 // Pílula de mobile do redesenho claro (ver front-redesign-fase0-agenda.md): 4 itens
-// (Agenda, Financeiro, Clientes, Mais) — Barbeiros/Serviços/Bloqueios migraram pra
-// dentro de "Mais". A sidebar de desktop (md+) não muda, continua com os 5 itens.
+// (Agenda, Financeiro, Clientes, Mais) — Barbeiros/Serviços migraram pra dentro de
+// "Mais". A sidebar de desktop (md+) não muda, continua com os 5 itens.
 const ABAS_MOBILE = [
   { to: "/painel", rotulo: "Agenda", fim: true, Icone: CalendarDays },
   { to: "/painel/financeiro", rotulo: "Financeiro", fim: false, Icone: Wallet },
   { to: "/painel/clientes", rotulo: "Clientes", fim: false, Icone: Users },
 ];
-const ROTAS_ABA_MAIS = ["/painel/mais", "/painel/barbeiros", "/painel/servicos", "/painel/bloqueios"];
+const ROTAS_ABA_MAIS = ["/painel/mais", "/painel/barbeiros", "/painel/servicos"];
 
 /** Ícone com tooltip que só aparece no hover — usado na sidebar de desktop (`md:` +), onde não há espaço pro rótulo ao lado. */
 function ItemSidebar({ to, fim, rotulo, Icone }: (typeof ABAS)[number]) {

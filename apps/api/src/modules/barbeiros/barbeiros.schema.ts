@@ -52,4 +52,10 @@ export const atualizarBarbeiroSchema = z
     message: "Informe ao menos um campo: ativo ou nome.",
   });
 
+/** Liga/desliga o vínculo do barbeiro com um serviço do catálogo (Fase D). */
+export const alternarVinculoServicoSchema = z.object({
+  ativo: z.boolean(),
+});
+
 export type SubstituirDisponibilidadeInput = z.infer<typeof substituirDisponibilidadeSchema>;
+export type AlternarVinculoServicoInput = z.infer<typeof alternarVinculoServicoSchema>;

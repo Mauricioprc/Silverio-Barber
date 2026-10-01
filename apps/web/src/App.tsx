@@ -19,7 +19,6 @@ const FinanceiroPage = lazy(() => import("./modulos/financeiro/FinanceiroPage"))
 const ClientesPage = lazy(() => import("./modulos/clientes/ClientesPage"));
 const ClienteDetalhePage = lazy(() => import("./modulos/clientes/ClienteDetalhePage"));
 const ServicosPage = lazy(() => import("./modulos/servicos/ServicosPage"));
-const BloqueiosPage = lazy(() => import("./modulos/agenda/BloqueiosPage"));
 const MaisPage = lazy(() => import("./modulos/painel/MaisPage"));
 
 function CarregandoRota() {
@@ -54,7 +53,6 @@ export default function App() {
                       <Route path="clientes" element={<ClientesPage />} />
                       <Route path="clientes/:id" element={<ClienteDetalhePage />} />
                       <Route path="servicos" element={<ServicosPage />} />
-                      <Route path="bloqueios" element={<BloqueiosPage />} />
                       <Route path="mais" element={<MaisPage />} />
                     </Route>
                   </Route>

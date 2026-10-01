@@ -7,6 +7,7 @@ import { useToast } from "../../../componentes/Toast";
 import { mensagemHumana } from "../../../lib/mensagens-erro";
 import { useEditarAgendamento, conflitoDeHorario } from "../hooks/useMutacoesAgendamento";
 import { useHorariosDisponiveis } from "../../agendamento-publico/hooks/useHorariosDisponiveis";
+import { useBarbeirosDoServico } from "../../servicos/hooks/useBarbeirosDoServico";
 import type { AgendamentoDoDia, BarbeiroInterno, ServicoInterno } from "../tipos";
 
 function horaCurta(horarioLocal: string): string {
@@ -29,6 +30,13 @@ export function ModalReagendar({ agendamento, barbeiros, servicos, onFechar }: P
   const [erro, setErro] = useState<string | null>(null);
 
   const { data: horarios, isLoading } = useHorariosDisponiveis(barbeiroId, data, servico?.duracaoMinutos ?? 0);
+  // Reagendar não troca o serviço (só horário/barbeiro) — então só oferece barbeiro que
+  // realmente faz o serviço do agendamento (Fase D), senão o back-end recusa na hora de
+  // confirmar com "Esse barbeiro não atende esse serviço".
+  const { data: barbeirosDoServico } = useBarbeirosDoServico(agendamento?.servicoId);
+  const barbeirosDisponiveis = barbeirosDoServico
+    ? barbeiros.filter((b) => barbeirosDoServico.some((bs) => bs.id === b.id))
+    : barbeiros;
   const editar = useEditarAgendamento();
   const { mostrarToast } = useToast();
 
@@ -62,7 +70,7 @@ export function ModalReagendar({ agendamento, barbeiros, servicos, onFechar }: P
         <p className="text-sm text-base-300">{agendamento.nomeCliente} — {servico?.nome}</p>
 
         <Select rotulo="Barbeiro" value={barbeiroId ?? ""} onChange={(e) => setBarbeiroId(Number(e.target.value) || null)}>
-          {barbeiros.map((b) => (
+          {barbeirosDisponiveis.map((b) => (
             <option key={b.id} value={b.id}>
               {b.nome}
             </option>

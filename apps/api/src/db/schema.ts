@@ -7,6 +7,7 @@ import {
   text,
   time,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -82,6 +83,30 @@ export const servicos = pgTable("servicos", {
   duracaoMinutos: integer("duracao_minutos").notNull(),
   ativo: boolean("ativo").notNull().default(true),
 });
+
+/**
+ * Vínculo barbeiro↔serviço (Fase D do redesenho de Serviços) — catálogo único
+ * (`servicos`, preço/duração continuam só ali, sem personalização por barbeiro, decisão
+ * confirmada) + esta tabela decide só **quem faz** cada serviço. `ativo=false` é soft
+ * delete do vínculo (não do serviço nem do barbeiro) — desvincular não apaga a linha,
+ * só marca que aquele barbeiro não aceita mais aquele serviço a partir de agora; não
+ * afeta `agendamentos` já criados (preço/duração já foram copiados pra lá na criação,
+ * regra 5 — ver comentário em `servicos`/`agendamentos` abaixo).
+ */
+export const barbeiroServicos = pgTable(
+  "barbeiro_servicos",
+  {
+    id: serial("id").primaryKey(),
+    barbeiroId: integer("barbeiro_id")
+      .notNull()
+      .references(() => barbeiros.id),
+    servicoId: integer("servico_id")
+      .notNull()
+      .references(() => servicos.id),
+    ativo: boolean("ativo").notNull().default(true),
+  },
+  (t) => [unique("barbeiro_servicos_par_unico").on(t.barbeiroId, t.servicoId)]
+);
 
 /**
  * Sessão persistida no banco (não um cookie assinado stateless): permite invalidar

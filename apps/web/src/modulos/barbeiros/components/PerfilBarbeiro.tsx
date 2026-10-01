@@ -14,7 +14,8 @@ import { CartaoHorario } from "./CartaoHorario";
 import { SheetHorario } from "./SheetHorario";
 import { CartaoAusencias } from "./CartaoAusencias";
 import { SheetAusencia } from "./SheetAusencia";
-import { FormularioAcesso } from "./FormularioAcesso";
+import { CartaoServicosDoBarbeiro } from "./CartaoServicosDoBarbeiro";
+import { CartaoContaAcesso } from "./CartaoContaAcesso";
 import type { BarbeiroInterno } from "../tipos";
 import type { Bloqueio } from "../../agenda/tipos";
 
@@ -176,7 +177,9 @@ export function PerfilBarbeiro({ barbeiro, modo }: Props) {
         ausenciaExistente={ausenciaEmEdicao}
       />
 
-      {modo === "proprio" && <FormularioAcesso usuarioAtual={barbeiro.usuario} telefoneAtual={barbeiro.telefone} />}
+      <CartaoServicosDoBarbeiro barbeiroId={barbeiro.id} />
+
+      {modo === "proprio" && <CartaoContaAcesso usuario={barbeiro.usuario} telefone={barbeiro.telefone} />}
     </div>
   );
 }
